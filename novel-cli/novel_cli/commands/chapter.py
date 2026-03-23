@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Never
+from typing import Any, Never
 
 import click
+from novel_runtime.pipeline.auditor import AuditIssue, AuditResult, ChapterAuditor
 from novel_runtime.pipeline.drafter import ChapterDraft, ChapterDrafter
 from novel_runtime.pipeline.postcheck import PostcheckRunner
+from novel_runtime.pipeline.reviser import ChapterReviser
+from novel_runtime.pipeline.router import ChapterRouter
 from novel_runtime.pipeline.settler import AlreadySettledError, ChapterSettler
 from novel_runtime.state.canonical import CanonicalState
 
@@ -107,6 +110,120 @@ def postcheck_chapter(chapter_number: int, text_file: Path, json_output: bool) -
     _emit(payload, text, json_output)
 
 
+@chapter_group.command("audit")
+@click.option("--chapter", "chapter_number", required=True, type=int)
+@click.option(
+    "--text-file",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option("--json", "json_output", is_flag=True)
+def audit_chapter(chapter_number: int, text_file: Path, json_output: bool) -> None:
+    state, _ = _load_state()
+    if _get_chapter(state, chapter_number) is None:
+        _raise_fail(f"chapter '{chapter_number}' not found", json_output)
+
+    result = ChapterAuditor().run(state, chapter_number, _read_text_file(text_file))
+    payload = result.to_dict()
+    text = _format_audit_text(payload)
+    _emit(payload, text, json_output)
+    if result.status == "fail":
+        raise SystemExit(1)
+
+
+@chapter_group.command("route")
+@click.option("--chapter", "chapter_number", required=True, type=int)
+@click.option(
+    "--audit-file",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option("--json", "json_output", is_flag=True)
+def route_chapter(chapter_number: int, audit_file: Path, json_output: bool) -> None:
+    state, _ = _load_state()
+    if _get_chapter(state, chapter_number) is None:
+        _raise_fail(f"chapter '{chapter_number}' not found", json_output)
+
+    audit = _load_audit_result(audit_file, json_output)
+    _validate_audit_chapter(audit, chapter_number, json_output)
+    decision = _route_chapter_audit(audit)
+    payload = {
+        "action": decision.action,
+        "reason": decision.reason,
+        "audit_summary": decision.audit_summary,
+    }
+    text = _format_route_text(payload)
+    _emit(payload, text, json_output)
+    if decision.action in {"rewrite", "escalate"}:
+        raise SystemExit(1)
+
+
+@chapter_group.command("revise")
+@click.option("--chapter", "chapter_number", required=True, type=int)
+@click.option(
+    "--text-file",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--audit-file",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option("--json", "json_output", is_flag=True)
+def revise_chapter(
+    chapter_number: int,
+    text_file: Path,
+    audit_file: Path,
+    json_output: bool,
+) -> None:
+    state, project_dir = _load_state()
+    if _get_chapter(state, chapter_number) is None:
+        _raise_fail(f"chapter '{chapter_number}' not found", json_output)
+
+    chapter_text = _read_text_file(text_file)
+    audit = _load_audit_result(audit_file, json_output)
+    _validate_audit_chapter(audit, chapter_number, json_output)
+    decision = _route_chapter_audit(audit)
+
+    if decision.action == "pass":
+        payload = {
+            "chapter": chapter_number,
+            "routing_action": decision.action,
+            "reason": decision.reason,
+        }
+        _emit(payload, f"No revision needed for chapter {chapter_number}", json_output)
+        return
+
+    if decision.action != "revise":
+        payload = {
+            "action": decision.action,
+            "reason": decision.reason,
+            "audit_summary": decision.audit_summary,
+        }
+        _emit(payload, _format_route_text(payload), json_output)
+        raise SystemExit(1)
+
+    result = ChapterReviser().revise(chapter_number, chapter_text, audit.issues)
+    revised_path = project_dir / "chapters" / f"chapter_{chapter_number}_revised.md"
+    revised_path.parent.mkdir(parents=True, exist_ok=True)
+    revised_path.write_text(result.revised_text, encoding="utf-8")
+
+    payload = {
+        "chapter": result.chapter,
+        "path": str(revised_path.resolve()),
+        "revised_text": result.revised_text,
+        "revision_log": result.revision_log,
+        "issues_addressed": result.issues_addressed,
+        "routing_action": decision.action,
+    }
+    _emit(
+        payload,
+        _format_revision_text(payload),
+        json_output,
+    )
+
+
 def _load_state() -> tuple[CanonicalState, Path]:
     project_dir = _resolve_project_dir()
     return CanonicalState.load(project_dir), project_dir
@@ -155,8 +272,57 @@ def _load_json_object(path: Path, label: str, json_output: bool) -> dict:
     return payload
 
 
+def _load_audit_result(path: Path, json_output: bool) -> AuditResult:
+    payload = _load_json_object(path, "audit file", json_output)
+    try:
+        issues_payload = payload["issues"]
+        assert isinstance(issues_payload, list)
+        return AuditResult(
+            chapter=int(payload["chapter"]),
+            status=str(payload["status"]),
+            severity=str(payload["severity"]),
+            recommended_action=str(payload["recommended_action"]),
+            issues=[_load_audit_issue(issue) for issue in issues_payload],
+        )
+    except (AssertionError, KeyError, TypeError, ValueError):
+        _raise_fail(
+            "invalid audit file JSON: expected audit result object", json_output
+        )
+
+
+def _load_audit_issue(payload: object) -> AuditIssue:
+    if not isinstance(payload, dict):
+        raise TypeError("audit issue must be an object")
+    return AuditIssue(
+        rule=str(payload["rule"]),
+        severity=str(payload["severity"]),
+        message=str(payload["message"]),
+        location=_load_issue_location(payload["location"]),
+    )
+
+
+def _load_issue_location(payload: object) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise TypeError("issue location must be an object")
+    return dict(payload)
+
+
 def _read_text_file(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def _route_chapter_audit(audit: AuditResult):
+    return ChapterRouter().route(audit)
+
+
+def _validate_audit_chapter(
+    audit: AuditResult, chapter_number: int, json_output: bool
+) -> None:
+    if audit.chapter != chapter_number:
+        _raise_fail(
+            f"audit file chapter '{audit.chapter}' does not match --chapter '{chapter_number}'",
+            json_output,
+        )
 
 
 def _format_postcheck_text(payload: dict[str, object]) -> str:
@@ -175,6 +341,51 @@ def _format_postcheck_text(payload: dict[str, object]) -> str:
         assert isinstance(issue, dict)
         lines.append(f"- {issue['rule']} | {issue['severity']} | {issue['message']}")
     return "\n".join(lines)
+
+
+def _format_audit_text(payload: dict[str, object]) -> str:
+    issues = payload["issues"]
+    assert isinstance(issues, list)
+    lines = [
+        f"Chapter: {payload['chapter']}",
+        f"Status: {payload['status']}",
+        f"Severity: {payload['severity']}",
+        f"Recommended action: {payload['recommended_action']}",
+    ]
+    if not issues:
+        lines.append("Issues: none")
+        return "\n".join(lines)
+
+    lines.append("Issues:")
+    for issue in issues:
+        assert isinstance(issue, dict)
+        lines.append(f"- {issue['rule']} | {issue['severity']} | {issue['message']}")
+    return "\n".join(lines)
+
+
+def _format_route_text(payload: dict[str, object]) -> str:
+    audit_summary = payload["audit_summary"]
+    assert isinstance(audit_summary, dict)
+    return "\n".join(
+        (
+            f"Chapter: {audit_summary['chapter']}",
+            f"Action: {payload['action']}",
+            f"Reason: {payload['reason']}",
+        )
+    )
+
+
+def _format_revision_text(payload: dict[str, object]) -> str:
+    issues_addressed = payload["issues_addressed"]
+    assert isinstance(issues_addressed, list)
+    return "\n".join(
+        (
+            f"Chapter: {payload['chapter']}",
+            f"Action: {payload['routing_action']}",
+            f"Issues addressed: {len(issues_addressed)}",
+            f"Output path: {payload['path']}",
+        )
+    )
 
 
 def _raise_fail(message: str, json_output: bool) -> Never:

@@ -8,10 +8,23 @@ from novel_runtime.state.snapshot import SnapshotManager
 from novel_cli.main import cli
 
 
+def _assert_current_chapter_surface(runner: CliRunner) -> None:
+    result = runner.invoke(cli, ["chapter", "--help"], catch_exceptions=False)
+
+    assert result.exit_code == 0
+    assert "draft" in result.output
+    assert "settle" in result.output
+    assert "postcheck" in result.output
+    assert "audit" in result.output
+    assert "route" in result.output
+    assert "revise" in result.output
+
+
 def test_chapter_full_lifecycle() -> None:
     runner = CliRunner()
 
     with runner.isolated_filesystem():
+        _assert_current_chapter_surface(runner)
         init_result = runner.invoke(
             cli,
             ["project", "init", "mybook", "--genre", "fantasy"],
@@ -116,6 +129,45 @@ def test_chapter_full_lifecycle() -> None:
             ],
             catch_exceptions=False,
         )
+        audit_payload = _invoke_json(
+            runner,
+            [
+                "chapter",
+                "audit",
+                "--chapter",
+                "1",
+                "--text-file",
+                str(chapter_text_path),
+            ],
+        )
+        audit_path = Path("audit.json")
+        audit_path.write_text(
+            json.dumps(audit_payload, ensure_ascii=False), encoding="utf-8"
+        )
+        route_payload = _invoke_json(
+            runner,
+            [
+                "chapter",
+                "route",
+                "--chapter",
+                "1",
+                "--audit-file",
+                str(audit_path),
+            ],
+        )
+        revise_payload = _invoke_json(
+            runner,
+            [
+                "chapter",
+                "revise",
+                "--chapter",
+                "1",
+                "--text-file",
+                str(chapter_text_path),
+                "--audit-file",
+                str(audit_path),
+            ],
+        )
         snapshot_result = runner.invoke(
             cli,
             ["snapshot", "create", "--label", "full-lifecycle"],
@@ -142,7 +194,32 @@ def test_chapter_full_lifecycle() -> None:
         assert drafted_text == expected_draft_text
         assert "Settled chapter 1" in settle_result.output
         assert "Passed: yes" in postcheck_result.output
+        assert audit_payload == {
+            "chapter": 1,
+            "status": "pass",
+            "severity": "none",
+            "recommended_action": "proceed_to_snapshot",
+            "issues": [],
+        }
+        assert route_payload == {
+            "action": "pass",
+            "reason": "audit passed with no blocking issues",
+            "audit_summary": {
+                "chapter": 1,
+                "status": "pass",
+                "severity": "none",
+                "recommended_action": "proceed_to_snapshot",
+                "issue_count": 0,
+                "blocker_issue_count": 0,
+            },
+        }
+        assert revise_payload == {
+            "chapter": 1,
+            "routing_action": "pass",
+            "reason": "audit passed with no blocking issues",
+        }
         assert "Created snapshot '" in snapshot_result.output
+        assert not (project_dir / "chapters" / "chapter_1_revised.md").exists()
 
         state_payload = json.loads(state_result.output)
         entities = state_payload["world"]["entities"]
@@ -183,6 +260,7 @@ def test_chapter_full_lifecycle_json_mode() -> None:
     runner = CliRunner()
 
     with runner.isolated_filesystem():
+        _assert_current_chapter_surface(runner)
         init_payload = _invoke_json(
             runner, ["project", "init", "mybook", "--genre", "fantasy"]
         )
@@ -280,6 +358,45 @@ def test_chapter_full_lifecycle_json_mode() -> None:
                 str(chapter_text_path),
             ],
         )
+        audit_payload = _invoke_json(
+            runner,
+            [
+                "chapter",
+                "audit",
+                "--chapter",
+                "1",
+                "--text-file",
+                str(chapter_text_path),
+            ],
+        )
+        audit_path = Path("audit.json")
+        audit_path.write_text(
+            json.dumps(audit_payload, ensure_ascii=False), encoding="utf-8"
+        )
+        route_payload = _invoke_json(
+            runner,
+            [
+                "chapter",
+                "route",
+                "--chapter",
+                "1",
+                "--audit-file",
+                str(audit_path),
+            ],
+        )
+        revise_payload = _invoke_json(
+            runner,
+            [
+                "chapter",
+                "revise",
+                "--chapter",
+                "1",
+                "--text-file",
+                str(chapter_text_path),
+                "--audit-file",
+                str(audit_path),
+            ],
+        )
         snapshot_payload = _invoke_json(
             runner, ["snapshot", "create", "--label", "full-lifecycle"]
         )
@@ -303,11 +420,36 @@ def test_chapter_full_lifecycle_json_mode() -> None:
         }
         assert settle_payload == {"chapter": 1, "status": "settled"}
         assert postcheck_payload == {"chapter": 1, "passed": True, "issues": []}
+        assert audit_payload == {
+            "chapter": 1,
+            "status": "pass",
+            "severity": "none",
+            "recommended_action": "proceed_to_snapshot",
+            "issues": [],
+        }
+        assert route_payload == {
+            "action": "pass",
+            "reason": "audit passed with no blocking issues",
+            "audit_summary": {
+                "chapter": 1,
+                "status": "pass",
+                "severity": "none",
+                "recommended_action": "proceed_to_snapshot",
+                "issue_count": 0,
+                "blocker_issue_count": 0,
+            },
+        }
+        assert revise_payload == {
+            "chapter": 1,
+            "routing_action": "pass",
+            "reason": "audit passed with no blocking issues",
+        }
 
         snapshot = snapshot_payload["snapshot"]
         assert snapshot["id"]
         assert snapshot["label"] == "full-lifecycle"
         assert snapshot["timestamp"]
+        assert not (project_dir / "chapters" / "chapter_1_revised.md").exists()
 
         state = state_payload["state"]
         assert state["project"] == CanonicalState.load(project_dir).data["project"]
