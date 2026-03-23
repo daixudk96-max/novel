@@ -5,10 +5,11 @@ from pathlib import Path
 from typing import Any, Never
 
 import click
+from novel_runtime.pipeline.approver import ChapterApprover
 from novel_runtime.pipeline.auditor import AuditIssue, AuditResult, ChapterAuditor
 from novel_runtime.pipeline.drafter import ChapterDraft, ChapterDrafter
 from novel_runtime.pipeline.postcheck import PostcheckRunner
-from novel_runtime.pipeline.reviser import ChapterReviser
+from novel_runtime.pipeline.reviser import ChapterReviser, RevisionResult
 from novel_runtime.pipeline.router import ChapterRouter
 from novel_runtime.pipeline.settler import AlreadySettledError, ChapterSettler
 from novel_runtime.state.canonical import CanonicalState
@@ -224,6 +225,48 @@ def revise_chapter(
     )
 
 
+@chapter_group.command("approve")
+@click.option("--chapter", "chapter_number", required=True, type=int)
+@click.option(
+    "--audit-file",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--revision-file",
+    required=False,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option("--json", "json_output", is_flag=True)
+def approve_chapter(
+    chapter_number: int,
+    audit_file: Path,
+    revision_file: Path | None,
+    json_output: bool,
+) -> None:
+    state, _ = _load_state()
+    if _get_chapter(state, chapter_number) is None:
+        _raise_fail(f"chapter '{chapter_number}' not found", json_output)
+
+    audit = _load_audit_result(audit_file, json_output)
+    _validate_audit_chapter(audit, chapter_number, json_output)
+    revision = None
+    if revision_file is not None:
+        revision = _load_revision_result(revision_file, json_output)
+        _validate_revision_chapter(revision, chapter_number, json_output)
+
+    result = ChapterApprover().approve(audit, revision)
+    payload = {
+        "chapter": result.chapter,
+        "status": result.status,
+        "reason": result.reason,
+        "conditions": list(result.conditions),
+    }
+    _emit(payload, _format_approval_text(payload), json_output)
+    if result.status == "rejected":
+        raise SystemExit(1)
+
+
 def _load_state() -> tuple[CanonicalState, Path]:
     project_dir = _resolve_project_dir()
     return CanonicalState.load(project_dir), project_dir
@@ -290,6 +333,27 @@ def _load_audit_result(path: Path, json_output: bool) -> AuditResult:
         )
 
 
+def _load_revision_result(path: Path, json_output: bool) -> RevisionResult:
+    payload = _load_json_object(path, "revision file", json_output)
+    try:
+        revision_log = payload["revision_log"]
+        issues_addressed = payload["issues_addressed"]
+        assert isinstance(revision_log, list)
+        assert isinstance(issues_addressed, list)
+        return RevisionResult(
+            chapter=int(payload["chapter"]),
+            revised_text=str(payload["revised_text"]),
+            revision_log=[str(item) for item in revision_log],
+            issues_addressed=[
+                _load_revision_issue(issue) for issue in issues_addressed
+            ],
+        )
+    except (AssertionError, KeyError, TypeError, ValueError):
+        _raise_fail(
+            "invalid revision file JSON: expected revision result object", json_output
+        )
+
+
 def _load_audit_issue(payload: object) -> AuditIssue:
     if not isinstance(payload, dict):
         raise TypeError("audit issue must be an object")
@@ -299,6 +363,10 @@ def _load_audit_issue(payload: object) -> AuditIssue:
         message=str(payload["message"]),
         location=_load_issue_location(payload["location"]),
     )
+
+
+def _load_revision_issue(payload: object) -> dict[str, Any]:
+    return _load_audit_issue(payload).to_dict()
 
 
 def _load_issue_location(payload: object) -> dict[str, Any]:
@@ -321,6 +389,16 @@ def _validate_audit_chapter(
     if audit.chapter != chapter_number:
         _raise_fail(
             f"audit file chapter '{audit.chapter}' does not match --chapter '{chapter_number}'",
+            json_output,
+        )
+
+
+def _validate_revision_chapter(
+    revision: RevisionResult, chapter_number: int, json_output: bool
+) -> None:
+    if revision.chapter != chapter_number:
+        _raise_fail(
+            f"revision file chapter '{revision.chapter}' does not match --chapter '{chapter_number}'",
             json_output,
         )
 
@@ -386,6 +464,24 @@ def _format_revision_text(payload: dict[str, object]) -> str:
             f"Output path: {payload['path']}",
         )
     )
+
+
+def _format_approval_text(payload: dict[str, object]) -> str:
+    conditions = payload["conditions"]
+    assert isinstance(conditions, list)
+    lines = [
+        f"Chapter: {payload['chapter']}",
+        f"Status: {payload['status']}",
+        f"Reason: {payload['reason']}",
+    ]
+    if not conditions:
+        lines.append("Conditions: none")
+        return "\n".join(lines)
+
+    lines.append("Conditions:")
+    for condition in conditions:
+        lines.append(f"- {condition}")
+    return "\n".join(lines)
 
 
 def _raise_fail(message: str, json_output: bool) -> Never:

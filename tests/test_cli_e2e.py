@@ -18,6 +18,7 @@ def _assert_current_chapter_surface(runner: CliRunner) -> None:
     assert "audit" in result.output
     assert "route" in result.output
     assert "revise" in result.output
+    assert "approve" in result.output
 
 
 def test_chapter_full_lifecycle() -> None:
@@ -168,6 +169,18 @@ def test_chapter_full_lifecycle() -> None:
                 str(audit_path),
             ],
         )
+        approve_result = runner.invoke(
+            cli,
+            [
+                "chapter",
+                "approve",
+                "--chapter",
+                "1",
+                "--audit-file",
+                str(audit_path),
+            ],
+            catch_exceptions=False,
+        )
         snapshot_result = runner.invoke(
             cli,
             ["snapshot", "create", "--label", "full-lifecycle"],
@@ -181,6 +194,7 @@ def test_chapter_full_lifecycle() -> None:
             draft_result,
             settle_result,
             postcheck_result,
+            approve_result,
             snapshot_result,
             state_result,
         ):
@@ -218,6 +232,12 @@ def test_chapter_full_lifecycle() -> None:
             "routing_action": "pass",
             "reason": "audit passed with no blocking issues",
         }
+        assert approve_result.output == (
+            "Chapter: 1\n"
+            "Status: approved\n"
+            "Reason: audit passed and chapter is ready for snapshot\n"
+            "Conditions: none\n"
+        )
         assert "Created snapshot '" in snapshot_result.output
         assert not (project_dir / "chapters" / "chapter_1_revised.md").exists()
 
@@ -397,6 +417,17 @@ def test_chapter_full_lifecycle_json_mode() -> None:
                 str(audit_path),
             ],
         )
+        approve_payload = _invoke_json(
+            runner,
+            [
+                "chapter",
+                "approve",
+                "--chapter",
+                "1",
+                "--audit-file",
+                str(audit_path),
+            ],
+        )
         snapshot_payload = _invoke_json(
             runner, ["snapshot", "create", "--label", "full-lifecycle"]
         )
@@ -443,6 +474,12 @@ def test_chapter_full_lifecycle_json_mode() -> None:
             "chapter": 1,
             "routing_action": "pass",
             "reason": "audit passed with no blocking issues",
+        }
+        assert approve_payload == {
+            "chapter": 1,
+            "status": "approved",
+            "reason": "audit passed and chapter is ready for snapshot",
+            "conditions": [],
         }
 
         snapshot = snapshot_payload["snapshot"]

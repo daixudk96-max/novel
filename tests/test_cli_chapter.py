@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import click
 from click.testing import CliRunner
 from novel_runtime.state.canonical import CanonicalState
 
@@ -19,6 +20,386 @@ def test_chapter_help_locks_current_executable_surface() -> None:
     assert "audit" in result.output
     assert "route" in result.output
     assert "revise" in result.output
+    assert "approve" in result.output
+
+
+def test_approve_returns_plain_text_for_passing_audit_without_revision() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_chapter(1)
+        audit_path = _write_audit_file(
+            {
+                "chapter": 1,
+                "status": "pass",
+                "severity": "none",
+                "recommended_action": "proceed_to_snapshot",
+                "issues": [],
+            }
+        )
+
+        result = runner.invoke(
+            cli,
+            [
+                "chapter",
+                "approve",
+                "--chapter",
+                "1",
+                "--audit-file",
+                str(audit_path),
+            ],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 0
+        assert result.output == (
+            "Chapter: 1\n"
+            "Status: approved\n"
+            "Reason: audit passed and chapter is ready for snapshot\n"
+            "Conditions: none\n"
+        )
+
+
+def test_approve_returns_json_for_failed_audit_with_revision_file() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_chapter(2)
+        audit_path = _write_audit_file(
+            {
+                "chapter": 2,
+                "status": "fail",
+                "severity": "major",
+                "recommended_action": "revise_chapter",
+                "issues": [
+                    {
+                        "rule": "continuity-gap",
+                        "severity": "major",
+                        "message": "chapter contradicts prior event",
+                        "location": {"line": 4, "start": 0, "end": 12, "excerpt": ""},
+                    }
+                ],
+            }
+        )
+        revision_path = _write_revision_file(
+            {
+                "chapter": 2,
+                "path": str(
+                    (Path.cwd() / "chapters" / "chapter_2_revised.md").resolve()
+                ),
+                "revised_text": "Scene text.\n<!-- REVISION NOTE: continuity-gap - chapter contradicts prior event -->",
+                "revision_log": [
+                    "<!-- REVISION NOTE: continuity-gap - chapter contradicts prior event -->"
+                ],
+                "issues_addressed": [
+                    {
+                        "rule": "continuity-gap",
+                        "severity": "major",
+                        "message": "chapter contradicts prior event",
+                        "location": {"line": 4, "start": 0, "end": 12, "excerpt": ""},
+                    }
+                ],
+                "routing_action": "revise",
+            }
+        )
+
+        result = runner.invoke(
+            cli,
+            [
+                "chapter",
+                "approve",
+                "--chapter",
+                "2",
+                "--audit-file",
+                str(audit_path),
+                "--revision-file",
+                str(revision_path),
+                "--json",
+            ],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 0
+        assert json.loads(result.output) == {
+            "chapter": 2,
+            "status": "conditionally_approved",
+            "reason": "audit failed, but revision addressed 1 issues",
+            "conditions": ["confirm continuity-gap remains resolved before snapshot"],
+        }
+
+
+def test_approve_returns_non_zero_for_failed_audit_without_revision_file() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_chapter(3)
+        audit_path = _write_audit_file(
+            {
+                "chapter": 3,
+                "status": "fail",
+                "severity": "major",
+                "recommended_action": "revise_chapter",
+                "issues": [
+                    {
+                        "rule": "motivation-gap",
+                        "severity": "major",
+                        "message": "motivation is unclear",
+                        "location": {"line": 7, "start": 0, "end": 15, "excerpt": ""},
+                    }
+                ],
+            }
+        )
+
+        result = runner.invoke(
+            cli,
+            [
+                "chapter",
+                "approve",
+                "--chapter",
+                "3",
+                "--audit-file",
+                str(audit_path),
+            ],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert result.output == (
+            "Chapter: 3\n"
+            "Status: rejected\n"
+            "Reason: audit failed and no revision was provided\n"
+            "Conditions:\n"
+            "- provide a revision that addresses the audit issues\n"
+        )
+
+
+def test_approve_rejects_invalid_audit_file_input() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_chapter(4)
+        audit_path = Path("audit.json")
+        audit_path.write_text("[]", encoding="utf-8")
+
+        result = runner.invoke(
+            cli,
+            [
+                "chapter",
+                "approve",
+                "--chapter",
+                "4",
+                "--audit-file",
+                str(audit_path),
+            ],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert result.output == "Error: audit file must decode to a JSON object\n"
+
+
+def test_approve_rejects_audit_file_for_different_chapter() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_chapter(5)
+        audit_path = _write_audit_file(
+            {
+                "chapter": 4,
+                "status": "pass",
+                "severity": "none",
+                "recommended_action": "proceed_to_snapshot",
+                "issues": [],
+            }
+        )
+
+        result = runner.invoke(
+            cli,
+            [
+                "chapter",
+                "approve",
+                "--chapter",
+                "5",
+                "--audit-file",
+                str(audit_path),
+            ],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert (
+            result.output
+            == "Error: audit file chapter '4' does not match --chapter '5'\n"
+        )
+
+
+def test_approve_rejects_malformed_revision_file_input() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_chapter(6)
+        audit_path = _write_audit_file(
+            {
+                "chapter": 6,
+                "status": "fail",
+                "severity": "major",
+                "recommended_action": "revise_chapter",
+                "issues": [
+                    {
+                        "rule": "continuity-gap",
+                        "severity": "major",
+                        "message": "chapter contradicts prior event",
+                        "location": {"line": 4, "start": 0, "end": 12, "excerpt": ""},
+                    }
+                ],
+            }
+        )
+        revision_path = _write_revision_file(
+            {
+                "chapter": 6,
+                "path": str(
+                    (Path.cwd() / "chapters" / "chapter_6_revised.md").resolve()
+                ),
+                "revised_text": "Scene text.",
+                "revision_log": [],
+                "issues_addressed": [{"message": "missing rule", "location": {}}],
+                "routing_action": "revise",
+            }
+        )
+
+        result = runner.invoke(
+            cli,
+            [
+                "chapter",
+                "approve",
+                "--chapter",
+                "6",
+                "--audit-file",
+                str(audit_path),
+                "--revision-file",
+                str(revision_path),
+            ],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert (
+            result.output
+            == "Error: invalid revision file JSON: expected revision result object\n"
+        )
+
+
+def test_approve_keeps_canonical_state_output_only_and_defers_downstream_steps(
+    monkeypatch,
+) -> None:
+    from novel_cli.commands import chapter as chapter_commands
+
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_chapter(6)
+        audit_path = _write_audit_file(
+            {
+                "chapter": 6,
+                "status": "fail",
+                "severity": "major",
+                "recommended_action": "revise_chapter",
+                "issues": [
+                    {
+                        "rule": "continuity-gap",
+                        "severity": "major",
+                        "message": "chapter contradicts prior event",
+                        "location": {"line": 4, "start": 0, "end": 12, "excerpt": ""},
+                    }
+                ],
+            }
+        )
+        revision_path = _write_revision_file(
+            {
+                "chapter": 6,
+                "path": str(
+                    (Path.cwd() / "chapters" / "chapter_6_revised.md").resolve()
+                ),
+                "revised_text": "Guardrail scene.\n<!-- REVISION NOTE: continuity-gap - chapter contradicts prior event -->",
+                "revision_log": [
+                    "<!-- REVISION NOTE: continuity-gap - chapter contradicts prior event -->"
+                ],
+                "issues_addressed": [
+                    {
+                        "rule": "continuity-gap",
+                        "severity": "major",
+                        "message": "chapter contradicts prior event",
+                        "location": {"line": 4, "start": 0, "end": 12, "excerpt": ""},
+                    }
+                ],
+                "routing_action": "revise",
+            }
+        )
+        before_state = json.loads(
+            json.dumps(CanonicalState.load(Path.cwd()).data, sort_keys=True)
+        )
+        before_files = _project_files()
+
+        class UnexpectedSettler:
+            def __init__(self, *args, **kwargs) -> None:
+                raise AssertionError(
+                    "approve must not invoke settle; that remains deferred"
+                )
+
+        class UnexpectedPostcheckRunner:
+            def __init__(self, *args, **kwargs) -> None:
+                raise AssertionError(
+                    "approve must not invoke postcheck; that remains deferred"
+                )
+
+        def unexpected_save(self, project_dir: Path) -> None:
+            raise AssertionError("approve must not save canonical state")
+
+        def unexpected_prompt(*args, **kwargs):
+            raise AssertionError(
+                "approve must not introduce interactive prompts; interactive/LLM approval remains deferred"
+            )
+
+        monkeypatch.setattr(chapter_commands, "ChapterSettler", UnexpectedSettler)
+        monkeypatch.setattr(
+            chapter_commands, "PostcheckRunner", UnexpectedPostcheckRunner
+        )
+        monkeypatch.setattr(CanonicalState, "save", unexpected_save)
+        monkeypatch.setattr(click, "prompt", unexpected_prompt)
+        monkeypatch.setattr(click, "confirm", unexpected_prompt)
+
+        result = runner.invoke(
+            cli,
+            [
+                "chapter",
+                "approve",
+                "--chapter",
+                "6",
+                "--audit-file",
+                str(audit_path),
+                "--revision-file",
+                str(revision_path),
+                "--json",
+            ],
+            catch_exceptions=False,
+        )
+
+        after_state = json.loads(
+            json.dumps(CanonicalState.load(Path.cwd()).data, sort_keys=True)
+        )
+        after_files = _project_files()
+
+        assert result.exit_code == 0
+        assert json.loads(result.output) == {
+            "chapter": 6,
+            "status": "conditionally_approved",
+            "reason": "audit failed, but revision addressed 1 issues",
+            "conditions": ["confirm continuity-gap remains resolved before snapshot"],
+        }
+        assert after_state == before_state
+        assert after_files == before_files, (
+            "approve must stay output-only; settle/postcheck/LLM/interactive approval remain deferred downstream steps"
+        )
 
 
 def test_route_returns_plain_text_for_pass_action() -> None:
@@ -1121,6 +1502,12 @@ def _write_audit_file(payload: dict[str, object]) -> Path:
     audit_path = Path("audit.json")
     audit_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
     return audit_path
+
+
+def _write_revision_file(payload: dict[str, object]) -> Path:
+    revision_path = Path("revision.json")
+    revision_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    return revision_path
 
 
 def _write_text_file(name: str, content: str) -> Path:
