@@ -1,0 +1,138 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.0.2, pluggy-1.6.0
+rootdir: E:\github\novel
+plugins: anyio-4.12.1, langsmith-0.4.59, asyncio-1.3.0, cov-7.0.0, timeout-2.4.0, tdd-guard-pytest-0.1.2
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 11 items
+
+tests\test_drafter.py ....FFFFFFF                                        [100%]
+
+================================== FAILURES ===================================
+___________ test_draft_requires_supported_route_a_provider_from_env ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000022073B72F50>
+
+    def test_draft_requires_supported_route_a_provider_from_env(monkeypatch) -> None:
+        drafter_module = _load_drafter_module()
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "anthropic")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "claude-3-7-sonnet")
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+    
+>       with pytest.raises(
+            ValueError,
+            match="unsupported Route A provider 'anthropic'; expected NOVEL_LLM_PROVIDER='openai'",
+        ):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests\test_drafter.py:76: Failed
+________ test_draft_requires_route_a_api_key_when_provider_env_is_set _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000022073BD4090>
+
+    def test_draft_requires_route_a_api_key_when_provider_env_is_set(monkeypatch) -> None:
+        drafter_module = _load_drafter_module()
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+        monkeypatch.delenv("NOVEL_LLM_API_KEY", raising=False)
+    
+>       with pytest.raises(
+            ValueError,
+            match="NOVEL_LLM_API_KEY is required when NOVEL_LLM_PROVIDER='openai'",
+        ):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests\test_drafter.py:89: Failed
+_________ test_draft_requires_route_a_model_when_provider_env_is_set __________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000022073B56210>
+
+    def test_draft_requires_route_a_model_when_provider_env_is_set(monkeypatch) -> None:
+        drafter_module = _load_drafter_module()
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.delenv("NOVEL_LLM_MODEL", raising=False)
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+    
+>       with pytest.raises(
+            ValueError,
+            match="NOVEL_LLM_MODEL is required when NOVEL_LLM_PROVIDER='openai'",
+        ):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests\test_drafter.py:102: Failed
+_________ test_draft_failure_rejects_invalid_temperature_input[warm] __________
+
+temperature = 'warm'
+
+    @pytest.mark.parametrize("temperature", ["warm", math.inf, -0.01, 2.01])
+    def test_draft_failure_rejects_invalid_temperature_input(temperature: object) -> None:
+        drafter_module = _load_drafter_module()
+    
+        with pytest.raises(
+            ValueError,
+            match="draft temperature must be a finite number between 0.0 and 2.0",
+        ):
+>           drafter_module.ChapterDrafter(temperature=temperature).draft(_build_state(), 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           TypeError: ChapterDrafter() takes no arguments
+
+tests\test_drafter.py:117: TypeError
+__________ test_draft_failure_rejects_invalid_temperature_input[inf] __________
+
+temperature = inf
+
+    @pytest.mark.parametrize("temperature", ["warm", math.inf, -0.01, 2.01])
+    def test_draft_failure_rejects_invalid_temperature_input(temperature: object) -> None:
+        drafter_module = _load_drafter_module()
+    
+        with pytest.raises(
+            ValueError,
+            match="draft temperature must be a finite number between 0.0 and 2.0",
+        ):
+>           drafter_module.ChapterDrafter(temperature=temperature).draft(_build_state(), 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           TypeError: ChapterDrafter() takes no arguments
+
+tests\test_drafter.py:117: TypeError
+_________ test_draft_failure_rejects_invalid_temperature_input[-0.01] _________
+
+temperature = -0.01
+
+    @pytest.mark.parametrize("temperature", ["warm", math.inf, -0.01, 2.01])
+    def test_draft_failure_rejects_invalid_temperature_input(temperature: object) -> None:
+        drafter_module = _load_drafter_module()
+    
+        with pytest.raises(
+            ValueError,
+            match="draft temperature must be a finite number between 0.0 and 2.0",
+        ):
+>           drafter_module.ChapterDrafter(temperature=temperature).draft(_build_state(), 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           TypeError: ChapterDrafter() takes no arguments
+
+tests\test_drafter.py:117: TypeError
+_________ test_draft_failure_rejects_invalid_temperature_input[2.01] __________
+
+temperature = 2.01
+
+    @pytest.mark.parametrize("temperature", ["warm", math.inf, -0.01, 2.01])
+    def test_draft_failure_rejects_invalid_temperature_input(temperature: object) -> None:
+        drafter_module = _load_drafter_module()
+    
+        with pytest.raises(
+            ValueError,
+            match="draft temperature must be a finite number between 0.0 and 2.0",
+        ):
+>           drafter_module.ChapterDrafter(temperature=temperature).draft(_build_state(), 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           TypeError: ChapterDrafter() takes no arguments
+
+tests\test_drafter.py:117: TypeError
+=========================== short test summary info ===========================
+FAILED tests/test_drafter.py::test_draft_requires_supported_route_a_provider_from_env
+FAILED tests/test_drafter.py::test_draft_requires_route_a_api_key_when_provider_env_is_set
+FAILED tests/test_drafter.py::test_draft_requires_route_a_model_when_provider_env_is_set
+FAILED tests/test_drafter.py::test_draft_failure_rejects_invalid_temperature_input[warm]
+FAILED tests/test_drafter.py::test_draft_failure_rejects_invalid_temperature_input[inf]
+FAILED tests/test_drafter.py::test_draft_failure_rejects_invalid_temperature_input[-0.01]
+FAILED tests/test_drafter.py::test_draft_failure_rejects_invalid_temperature_input[2.01]
+========================= 7 failed, 4 passed in 0.74s =========================

@@ -1,0 +1,3 @@
+rtk: warning: hash file exists but hook is missing
+  Run `rtk init -g` to reinstall.
+🔍 0 for 'config file|MCP|REST|Route B'

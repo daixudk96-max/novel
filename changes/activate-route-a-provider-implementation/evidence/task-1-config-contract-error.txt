@@ -1,0 +1,160 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.0.2, pluggy-1.6.0
+rootdir: E:\github\novel
+plugins: anyio-4.12.1, langsmith-0.4.59, asyncio-1.3.0, cov-7.0.0, timeout-2.4.0, tdd-guard-pytest-0.1.2
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 36 items / 26 deselected / 10 selected
+
+tests\test_cli_chapter.py ....FFFFFF                                     [100%]
+
+================================== FAILURES ===================================
+_ test_draft_provider_plain_error_is_fail_fast_for_unsupported_route_a_provider _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001B2EB4CC050>
+
+    def test_draft_provider_plain_error_is_fail_fast_for_unsupported_route_a_provider(
+        monkeypatch,
+    ) -> None:
+        runner = CliRunner()
+    
+        with runner.isolated_filesystem():
+            _save_state_with_active_entity()
+            monkeypatch.setenv("NOVEL_LLM_PROVIDER", "anthropic")
+            monkeypatch.setenv("NOVEL_LLM_MODEL", "claude-3-7-sonnet")
+            monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+    
+            result = runner.invoke(
+                cli, ["chapter", "draft", "--chapter", "1"], catch_exceptions=False
+            )
+    
+>           assert result.exit_code == 1
+E           assert 0 == 1
+E            +  where 0 = <Result okay>.exit_code
+
+tests\test_cli_chapter.py:1300: AssertionError
+__________ test_draft_provider_plain_error_requires_route_a_api_key ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001B2EB4C9CD0>
+
+    def test_draft_provider_plain_error_requires_route_a_api_key(monkeypatch) -> None:
+        runner = CliRunner()
+    
+        with runner.isolated_filesystem():
+            _save_state_with_active_entity()
+            monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+            monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+            monkeypatch.delenv("NOVEL_LLM_API_KEY", raising=False)
+    
+            result = runner.invoke(
+                cli, ["chapter", "draft", "--chapter", "1"], catch_exceptions=False
+            )
+    
+>           assert result.exit_code == 1
+E           assert 0 == 1
+E            +  where 0 = <Result okay>.exit_code
+
+tests\test_cli_chapter.py:1322: AssertionError
+___________ test_draft_provider_plain_error_requires_route_a_model ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001B2EB4CAC90>
+
+    def test_draft_provider_plain_error_requires_route_a_model(monkeypatch) -> None:
+        runner = CliRunner()
+    
+        with runner.isolated_filesystem():
+            _save_state_with_active_entity()
+            monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+            monkeypatch.delenv("NOVEL_LLM_MODEL", raising=False)
+            monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+    
+            result = runner.invoke(
+                cli, ["chapter", "draft", "--chapter", "1"], catch_exceptions=False
+            )
+    
+>           assert result.exit_code == 1
+E           assert 0 == 1
+E            +  where 0 = <Result okay>.exit_code
+
+tests\test_cli_chapter.py:1344: AssertionError
+_ test_draft_json_error_reports_unsupported_route_a_provider_without_placeholder_fallback _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001B2EB47FE90>
+
+    def test_draft_json_error_reports_unsupported_route_a_provider_without_placeholder_fallback(
+        monkeypatch,
+    ) -> None:
+        runner = CliRunner()
+    
+        with runner.isolated_filesystem():
+            _save_state_with_active_entity()
+            monkeypatch.setenv("NOVEL_LLM_PROVIDER", "anthropic")
+            monkeypatch.setenv("NOVEL_LLM_MODEL", "claude-3-7-sonnet")
+            monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+    
+            result = runner.invoke(
+                cli,
+                ["--json", "chapter", "draft", "--chapter", "1"],
+                catch_exceptions=False,
+            )
+    
+>           assert result.exit_code == 1
+E           assert 0 == 1
+E            +  where 0 = <Result okay>.exit_code
+
+tests\test_cli_chapter.py:1370: AssertionError
+_______________ test_draft_json_error_requires_route_a_api_key ________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001B2EA05FB10>
+
+    def test_draft_json_error_requires_route_a_api_key(monkeypatch) -> None:
+        runner = CliRunner()
+    
+        with runner.isolated_filesystem():
+            _save_state_with_active_entity()
+            monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+            monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+            monkeypatch.delenv("NOVEL_LLM_API_KEY", raising=False)
+    
+            result = runner.invoke(
+                cli,
+                ["--json", "chapter", "draft", "--chapter", "1"],
+                catch_exceptions=False,
+            )
+    
+>           assert result.exit_code == 1
+E           assert 0 == 1
+E            +  where 0 = <Result okay>.exit_code
+
+tests\test_cli_chapter.py:1394: AssertionError
+________________ test_draft_json_error_requires_route_a_model _________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001B2EB4B5590>
+
+    def test_draft_json_error_requires_route_a_model(monkeypatch) -> None:
+        runner = CliRunner()
+    
+        with runner.isolated_filesystem():
+            _save_state_with_active_entity()
+            monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+            monkeypatch.delenv("NOVEL_LLM_MODEL", raising=False)
+            monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+    
+            result = runner.invoke(
+                cli,
+                ["--json", "chapter", "draft", "--chapter", "1"],
+                catch_exceptions=False,
+            )
+    
+>           assert result.exit_code == 1
+E           assert 0 == 1
+E            +  where 0 = <Result okay>.exit_code
+
+tests\test_cli_chapter.py:1418: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_cli_chapter.py::test_draft_provider_plain_error_is_fail_fast_for_unsupported_route_a_provider
+FAILED tests/test_cli_chapter.py::test_draft_provider_plain_error_requires_route_a_api_key
+FAILED tests/test_cli_chapter.py::test_draft_provider_plain_error_requires_route_a_model
+FAILED tests/test_cli_chapter.py::test_draft_json_error_reports_unsupported_route_a_provider_without_placeholder_fallback
+FAILED tests/test_cli_chapter.py::test_draft_json_error_requires_route_a_api_key
+FAILED tests/test_cli_chapter.py::test_draft_json_error_requires_route_a_model
+================= 6 failed, 4 passed, 26 deselected in 1.92s ==================
