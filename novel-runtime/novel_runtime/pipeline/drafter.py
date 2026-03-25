@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 
+from novel_runtime.llm.provider import RouteAProvider, build_route_a_provider
+from novel_runtime.llm.temperature import (
+    DEFAULT_DRAFT_TEMPERATURE,
+    normalize_draft_temperature,
+)
 from novel_runtime.state.canonical import CanonicalState
 
 
@@ -15,6 +21,17 @@ class ChapterDraft:
 
 
 class ChapterDrafter:
+    def __init__(
+        self,
+        *,
+        provider: RouteAProvider | None = None,
+        provider_factory: Callable[[], RouteAProvider] = build_route_a_provider,
+        temperature: object = DEFAULT_DRAFT_TEMPERATURE,
+    ) -> None:
+        self._provider = provider
+        self._provider_factory = provider_factory
+        self._temperature = normalize_draft_temperature(temperature)
+
     def draft(self, state: CanonicalState, chapter_number: int) -> ChapterDraft:
         if type(chapter_number) is not int:
             raise ValueError("chapter_number must be an integer")
@@ -27,13 +44,51 @@ class ChapterDrafter:
 
         title = f"Chapter {chapter_number}"
         summary = f"{entity['name']} takes the next step."
+        content = self._draft_content(
+            chapter_number=chapter_number,
+            entity_name=entity["name"],
+            summary=summary,
+        )
         return ChapterDraft(
             chapter=chapter_number,
             title=title,
             status="draft",
             summary=summary,
-            content=f"# {title}\n\n{summary}\n",
+            content=content,
         )
+
+    def _draft_content(
+        self,
+        *,
+        chapter_number: int,
+        entity_name: str,
+        summary: str,
+    ) -> str:
+        prompt = (
+            f"Draft Chapter {chapter_number} about {entity_name}. Summary: {summary}"
+        )
+
+        try:
+            content = self._resolve_provider().draft(
+                prompt=prompt,
+                temperature=self._temperature,
+            )
+        except Exception as exc:
+            raise ValueError(
+                f"chapter {chapter_number} draft provider failed: {exc}"
+            ) from exc
+
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError(
+                f"chapter {chapter_number} draft provider returned empty content"
+            )
+
+        return content
+
+    def _resolve_provider(self) -> RouteAProvider:
+        if self._provider is None:
+            self._provider = self._provider_factory()
+        return self._provider
 
     def _first_active_world_entity(self, state: CanonicalState) -> dict | None:
         for entity in state.data["world"]["entities"]:
