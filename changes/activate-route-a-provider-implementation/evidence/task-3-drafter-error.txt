@@ -1,0 +1,29 @@
+rtk: warning: hash file exists but hook is missing
+  Run `rtk init -g` to reinstall.
+🔍 6 in 3F:
+
+📄 12 (1):
+     0: object) -> float:
+
+📄 17 (1):
+     0: 
+
+📄 novel-runtime/novel_runtime/llm/temperature.py (4):
+     8: "draft temperature must be a finite number between 0.0 and 2.0"
+    16: temperature = float(value)
+    20: return temperature
+    26: "normalize_draft_temperature",
+
+rtk: warning: hash file exists but hook is missing
+  Run `rtk init -g` to reinstall.
+🔍 5 in 2F:
+
+📄 29 (1):
+     0: object = DEFAULT_DRAFT_TEMPERATURE,
+
+📄 novel-runtime/novel_runtime/pipeline/drafter.py (4):
+     7: from novel_runtime.llm.temperature import (
+     9: normalize_draft_temperature,
+    33: self._temperature = normalize_draft_temperature(temperature)
+    74: temperature=self._temperature,
+
