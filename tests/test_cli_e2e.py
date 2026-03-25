@@ -21,10 +21,18 @@ def _assert_current_chapter_surface(runner: CliRunner) -> None:
     assert "approve" in result.output
 
 
-def test_chapter_full_lifecycle() -> None:
+def test_chapter_full_lifecycle(monkeypatch) -> None:
+    from novel_cli.commands import chapter as chapter_commands
+
     runner = CliRunner()
 
     with runner.isolated_filesystem():
+        monkeypatch.setattr(
+            chapter_commands, "build_route_a_provider", lambda: _E2EFakeDraftProvider()
+        )
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
         _assert_current_chapter_surface(runner)
         init_result = runner.invoke(
             cli,
@@ -276,10 +284,18 @@ def test_chapter_full_lifecycle() -> None:
         assert snapshot_state["timeline"] == state_payload["timeline"]
 
 
-def test_chapter_full_lifecycle_json_mode() -> None:
+def test_chapter_full_lifecycle_json_mode(monkeypatch) -> None:
+    from novel_cli.commands import chapter as chapter_commands
+
     runner = CliRunner()
 
     with runner.isolated_filesystem():
+        monkeypatch.setattr(
+            chapter_commands, "build_route_a_provider", lambda: _E2EFakeDraftProvider()
+        )
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
         _assert_current_chapter_surface(runner)
         init_payload = _invoke_json(
             runner, ["project", "init", "mybook", "--genre", "fantasy"]
@@ -527,3 +543,15 @@ def _invoke_json(runner: CliRunner, args: list[str]) -> dict:
     result = runner.invoke(cli, ["--json", *args], catch_exceptions=False)
     assert result.exit_code == 0
     return json.loads(result.output)
+
+
+class _E2EFakeDraftProvider:
+    def draft(self, *, prompt: str, temperature: float) -> str:
+        assert temperature == 1.0
+        prefix = "Draft Chapter "
+        summary_marker = ". Summary: "
+        assert prompt.startswith(prefix)
+        assert summary_marker in prompt
+        header, summary = prompt.split(summary_marker, maxsplit=1)
+        chapter_number, _, _ = header.removeprefix(prefix).partition(" about ")
+        return f"# Chapter {chapter_number}\n\n{summary}\n"

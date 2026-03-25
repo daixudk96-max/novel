@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Never
 
 import click
+from novel_runtime.llm.provider import build_route_a_provider
 from novel_runtime.pipeline.approver import ChapterApprover
 from novel_runtime.pipeline.auditor import AuditIssue, AuditResult, ChapterAuditor
 from novel_runtime.pipeline.drafter import ChapterDraft, ChapterDrafter
@@ -28,7 +29,8 @@ def chapter_group() -> None:
 def draft_chapter(chapter_number: int, json_output: bool) -> None:
     state, project_dir = _load_state()
     try:
-        draft = ChapterDrafter().draft(state, chapter_number)
+        _require_draft_entity(state, chapter_number)
+        draft = _build_chapter_drafter().draft(state, chapter_number)
     except ValueError as exc:
         _raise_fail(str(exc), json_output)
 
@@ -270,6 +272,24 @@ def approve_chapter(
 def _load_state() -> tuple[CanonicalState, Path]:
     project_dir = _resolve_project_dir()
     return CanonicalState.load(project_dir), project_dir
+
+
+def _build_chapter_drafter() -> ChapterDrafter:
+    return ChapterDrafter(provider=build_route_a_provider())
+
+
+def _require_draft_entity(state: CanonicalState, chapter_number: int) -> None:
+    for entity in state.data["world"]["entities"]:
+        if not isinstance(entity, dict):
+            continue
+        if entity.get("visibility") != "active":
+            continue
+        if not isinstance(entity.get("name"), str) or not entity["name"].strip():
+            continue
+        return
+    raise ValueError(
+        f"chapter {chapter_number} draft requires at least one active world entity"
+    )
 
 
 def _upsert_chapter(state: CanonicalState, draft: ChapterDraft) -> dict[str, object]:

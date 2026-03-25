@@ -1094,8 +1094,19 @@ def test_revise_returns_non_zero_and_skips_file_write_for_non_revise_actions() -
         assert not (Path("chapters") / "chapter_4_revised.md").exists()
 
 
-def test_draft_creates_runtime_backed_file() -> None:
+def test_draft_creates_runtime_backed_file(monkeypatch) -> None:
+    from novel_cli.commands import chapter as chapter_commands
+
     runner = CliRunner()
+
+    class FakeProvider:
+        def draft(self, *, prompt: str, temperature: float) -> str:
+            assert (
+                prompt
+                == "Draft Chapter 2 about Mira. Summary: Mira takes the next step."
+            )
+            assert temperature == 1.0
+            return "# Chapter 2\n\nMira takes the next step.\n"
 
     with runner.isolated_filesystem():
         state = CanonicalState.create_empty("mybook", "fantasy")
@@ -1109,6 +1120,12 @@ def test_draft_creates_runtime_backed_file() -> None:
             }
         )
         state.save(Path.cwd())
+        monkeypatch.setattr(
+            chapter_commands, "build_route_a_provider", lambda: FakeProvider()
+        )
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
 
         result = runner.invoke(
             cli, ["chapter", "draft", "--chapter", "2"], catch_exceptions=False
@@ -1134,8 +1151,19 @@ def test_draft_creates_runtime_backed_file() -> None:
         ]
 
 
-def test_draft_json_output_matches_runtime_contract() -> None:
+def test_draft_json_output_matches_runtime_contract(monkeypatch) -> None:
+    from novel_cli.commands import chapter as chapter_commands
+
     runner = CliRunner()
+
+    class FakeProvider:
+        def draft(self, *, prompt: str, temperature: float) -> str:
+            assert (
+                prompt
+                == "Draft Chapter 3 about Mira. Summary: Mira takes the next step."
+            )
+            assert temperature == 1.0
+            return "# Chapter 3\n\nMira takes the next step.\n"
 
     with runner.isolated_filesystem():
         state = CanonicalState.create_empty("mybook", "fantasy")
@@ -1149,6 +1177,12 @@ def test_draft_json_output_matches_runtime_contract() -> None:
             }
         )
         state.save(Path.cwd())
+        monkeypatch.setattr(
+            chapter_commands, "build_route_a_provider", lambda: FakeProvider()
+        )
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
 
         result = runner.invoke(
             cli,
@@ -1184,8 +1218,19 @@ def test_draft_json_output_matches_runtime_contract() -> None:
         ]
 
 
-def test_draft_resets_settled_at_when_redrafting_settled_chapter() -> None:
+def test_draft_resets_settled_at_when_redrafting_settled_chapter(monkeypatch) -> None:
+    from novel_cli.commands import chapter as chapter_commands
+
     runner = CliRunner()
+
+    class FakeProvider:
+        def draft(self, *, prompt: str, temperature: float) -> str:
+            assert (
+                prompt
+                == "Draft Chapter 1 about Mira. Summary: Mira takes the next step."
+            )
+            assert temperature == 1.0
+            return "# Chapter 1\n\nMira takes the next step.\n"
 
     with runner.isolated_filesystem():
         state = CanonicalState.create_empty("mybook", "fantasy")
@@ -1208,6 +1253,12 @@ def test_draft_resets_settled_at_when_redrafting_settled_chapter() -> None:
             }
         )
         state.save(Path.cwd())
+        monkeypatch.setattr(
+            chapter_commands, "build_route_a_provider", lambda: FakeProvider()
+        )
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
 
         result = runner.invoke(
             cli, ["chapter", "draft", "--chapter", "1"], catch_exceptions=False
@@ -1227,6 +1278,85 @@ def test_draft_resets_settled_at_when_redrafting_settled_chapter() -> None:
                 "settled_at": "",
             }
         ]
+
+
+def test_draft_requires_route_a_provider_env_plain_output() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_active_entity()
+
+        result = runner.invoke(
+            cli, ["chapter", "draft", "--chapter", "1"], catch_exceptions=False
+        )
+
+        assert result.exit_code == 1
+        assert (
+            result.output
+            == "Error: NOVEL_LLM_PROVIDER is required for Route A provider resolution\n"
+        )
+        assert not (Path("chapters") / "chapter_1.md").exists()
+        assert CanonicalState.load(Path.cwd()).data["chapters"] == []
+
+
+def test_draft_requires_route_a_provider_env_json_output() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_active_entity()
+
+        result = runner.invoke(
+            cli,
+            ["--json", "chapter", "draft", "--chapter", "1"],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert json.loads(result.output) == {
+            "error": "NOVEL_LLM_PROVIDER is required for Route A provider resolution",
+            "code": 1,
+        }
+        assert not (Path("chapters") / "chapter_1.md").exists()
+        assert CanonicalState.load(Path.cwd()).data["chapters"] == []
+
+
+def test_draft_uses_route_a_provider_when_env_is_configured(monkeypatch) -> None:
+    from novel_cli.commands import chapter as chapter_commands
+
+    runner = CliRunner()
+
+    class FakeProvider:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+
+        def draft(self, *, prompt: str, temperature: float) -> str:
+            self.calls.append({"prompt": prompt, "temperature": temperature})
+            return "Provider-backed draft body."
+
+    with runner.isolated_filesystem():
+        provider = FakeProvider()
+        _save_state_with_active_entity()
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+        monkeypatch.setattr(
+            chapter_commands, "build_route_a_provider", lambda: provider
+        )
+
+        result = runner.invoke(
+            cli, ["chapter", "draft", "--chapter", "4"], catch_exceptions=False
+        )
+
+        assert result.exit_code == 0
+        assert provider.calls == [
+            {
+                "prompt": "Draft Chapter 4 about Mira. Summary: Mira takes the next step.",
+                "temperature": 1.0,
+            }
+        ]
+        assert (Path("chapters") / "chapter_4.md").read_text(encoding="utf-8") == (
+            "Provider-backed draft body."
+        )
 
 
 def test_draft_requires_active_world_entity_plain_output() -> None:
@@ -1280,6 +1410,148 @@ def test_draft_failure_without_selected_project_json_output() -> None:
             "error": "no novel project selected",
             "code": 1,
         }
+
+
+def test_draft_provider_plain_error_is_fail_fast_for_unsupported_route_a_provider(
+    monkeypatch,
+) -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_active_entity()
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "anthropic")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "claude-3-7-sonnet")
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+
+        result = runner.invoke(
+            cli, ["chapter", "draft", "--chapter", "1"], catch_exceptions=False
+        )
+
+        assert result.exit_code == 1
+        assert (
+            result.output
+            == "Error: unsupported Route A provider 'anthropic'; expected NOVEL_LLM_PROVIDER='openai'\n"
+        )
+        assert not (Path("chapters") / "chapter_1.md").exists()
+        assert CanonicalState.load(Path.cwd()).data["chapters"] == []
+
+
+def test_draft_provider_plain_error_requires_route_a_api_key(monkeypatch) -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_active_entity()
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+        monkeypatch.delenv("NOVEL_LLM_API_KEY", raising=False)
+
+        result = runner.invoke(
+            cli, ["chapter", "draft", "--chapter", "1"], catch_exceptions=False
+        )
+
+        assert result.exit_code == 1
+        assert (
+            result.output
+            == "Error: NOVEL_LLM_API_KEY is required when NOVEL_LLM_PROVIDER='openai'\n"
+        )
+        assert not (Path("chapters") / "chapter_1.md").exists()
+        assert CanonicalState.load(Path.cwd()).data["chapters"] == []
+
+
+def test_draft_provider_plain_error_requires_route_a_model(monkeypatch) -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_active_entity()
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.delenv("NOVEL_LLM_MODEL", raising=False)
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+
+        result = runner.invoke(
+            cli, ["chapter", "draft", "--chapter", "1"], catch_exceptions=False
+        )
+
+        assert result.exit_code == 1
+        assert (
+            result.output
+            == "Error: NOVEL_LLM_MODEL is required when NOVEL_LLM_PROVIDER='openai'\n"
+        )
+        assert not (Path("chapters") / "chapter_1.md").exists()
+        assert CanonicalState.load(Path.cwd()).data["chapters"] == []
+
+
+def test_draft_json_error_reports_unsupported_route_a_provider_without_placeholder_fallback(
+    monkeypatch,
+) -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_active_entity()
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "anthropic")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "claude-3-7-sonnet")
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+
+        result = runner.invoke(
+            cli,
+            ["--json", "chapter", "draft", "--chapter", "1"],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert json.loads(result.output) == {
+            "error": "unsupported Route A provider 'anthropic'; expected NOVEL_LLM_PROVIDER='openai'",
+            "code": 1,
+        }
+        assert not (Path("chapters") / "chapter_1.md").exists()
+        assert CanonicalState.load(Path.cwd()).data["chapters"] == []
+
+
+def test_draft_json_error_requires_route_a_api_key(monkeypatch) -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_active_entity()
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+        monkeypatch.delenv("NOVEL_LLM_API_KEY", raising=False)
+
+        result = runner.invoke(
+            cli,
+            ["--json", "chapter", "draft", "--chapter", "1"],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert json.loads(result.output) == {
+            "error": "NOVEL_LLM_API_KEY is required when NOVEL_LLM_PROVIDER='openai'",
+            "code": 1,
+        }
+        assert not (Path("chapters") / "chapter_1.md").exists()
+        assert CanonicalState.load(Path.cwd()).data["chapters"] == []
+
+
+def test_draft_json_error_requires_route_a_model(monkeypatch) -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_active_entity()
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.delenv("NOVEL_LLM_MODEL", raising=False)
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+
+        result = runner.invoke(
+            cli,
+            ["--json", "chapter", "draft", "--chapter", "1"],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert json.loads(result.output) == {
+            "error": "NOVEL_LLM_MODEL is required when NOVEL_LLM_PROVIDER='openai'",
+            "code": 1,
+        }
+        assert not (Path("chapters") / "chapter_1.md").exists()
+        assert CanonicalState.load(Path.cwd()).data["chapters"] == []
 
 
 def test_settle_updates_state() -> None:
@@ -1493,6 +1765,20 @@ def _save_state_with_chapter(chapter_number: int) -> None:
             "status": "draft",
             "summary": "Summary.",
             "settled_at": "",
+        }
+    )
+    state.save(Path.cwd())
+
+
+def _save_state_with_active_entity() -> None:
+    state = CanonicalState.create_empty("mybook", "fantasy")
+    state.data["world"]["entities"].append(
+        {
+            "id": "entity-1",
+            "name": "Mira",
+            "type": "character",
+            "attributes": {"role": "lead"},
+            "visibility": "active",
         }
     )
     state.save(Path.cwd())
