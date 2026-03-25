@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "novel-runtime"
+dynamic = ["version"]
+description = "Novel Runtime core package"
+requires-python = ">=3.12"
+dependencies = ["openai>=1.0.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "novel_runtime.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["novel_runtime*"]
