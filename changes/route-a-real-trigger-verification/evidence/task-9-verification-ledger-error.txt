@@ -1,0 +1,96 @@
+# Task 9 Cleanup and Rerun Transcript
+
+## Cleanup notes
+- Cleanup removed only ephemeral chapter outputs and the temporary harness-smoke workspace files.
+- Cleanup kept the retained workspace manifests, fake draft fixtures, `runtime/provider-call.json`, and all evidence files.
+- The offline success rerun recreated `runtime/happy/mybook/chapters/chapter_1.md` after cleanup, which is expected.
+
+## Directory snapshot before cleanup
+### `changes/route-a-real-trigger-verification/runtime/`
+- `env-contract/`
+- `happy/`
+- `harness-smoke/`
+- `no-entity/`
+- `no-project/`
+- `redraft/`
+- `provider-call.json`
+- `provider-draft.txt`
+
+### `changes/route-a-real-trigger-verification/evidence/`
+- `task-1-packaged-preflight.txt`
+- `task-1-packaged-preflight-error.txt`
+- `task-2-fake-provider-harness.txt`
+- `task-2-fake-provider-harness-error.txt`
+- `task-3-workspace-bootstrap.txt`
+- `task-3-workspace-bootstrap-error.txt`
+- `task-4-no-project-and-entity-guard.txt`
+- `task-4-no-project-and-entity-guard-error.txt`
+- `task-5-provider-env-contract.txt`
+- `task-5-provider-env-contract-error.txt`
+- `task-6-provider-missing-fields.txt`
+- `task-6-provider-missing-fields-error.txt`
+- `task-7-happy-path-plain.txt`
+- `task-7-happy-path-plain-error.txt`
+- `task-8-happy-path-json-and-redraft.txt`
+- `task-8-happy-path-json-and-redraft-error.txt`
+
+## Cleanup command
+- Command: `rtk py -3.12 -c "from pathlib import Path; paths=[Path('changes/route-a-real-trigger-verification/runtime/harness-smoke/mybook/chapters/chapter_1.md'),Path('changes/route-a-real-trigger-verification/runtime/harness-smoke/mybook/canonical_state.json'),Path('changes/route-a-real-trigger-verification/runtime/harness-smoke/mybook/canonical_state.json.lock'),Path('changes/route-a-real-trigger-verification/runtime/harness-smoke/.novel_project_path'),Path('changes/route-a-real-trigger-verification/runtime/happy/mybook/chapters/chapter_1.md'),Path('changes/route-a-real-trigger-verification/runtime/happy/mybook/chapters/chapter_2.md'),Path('changes/route-a-real-trigger-verification/runtime/redraft/mybook/chapters/chapter_1.md')]; [p.unlink() for p in paths if p.exists()]"`
+- Exit code: `0`
+
+## Failure rerun
+- Command: `C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe --json chapter draft --chapter 1`
+- Cwd: `changes\route-a-real-trigger-verification\runtime\no-entity`
+- Exit code: `1`
+- Stdout:
+  ```
+  {"code": 1, "error": "chapter 1 draft requires at least one active world entity"}
+  ```
+- Stderr: empty
+- Directory snapshot after failure rerun:
+  - `changes/route-a-real-trigger-verification/runtime/no-entity/.novel_project_path`
+  - `changes/route-a-real-trigger-verification/runtime/no-entity/mybook/canonical_state.json`
+  - `changes/route-a-real-trigger-verification/runtime/no-entity/mybook/canonical_state.json.lock`
+
+## Success rerun
+- Command: `C:/Users/daixu/AppData/Local/Programs/Python/Python312/Scripts/novel.exe chapter draft --chapter 1`
+- Cwd: `E:/github/novel/changes/route-a-real-trigger-verification/runtime/happy`
+- Exit code: `0`
+- Stdout:
+  ```
+  Drafted chapter 1 at E:\github\novel\changes\route-a-real-trigger-verification\runtime\happy\mybook\chapters\chapter_1.md
+  ```
+- Stderr: empty
+- Env:
+  - `PYTHONPATH=E:/github/novel/changes/route-a-real-trigger-verification/support`
+  - `NOVEL_REAL_VERIFY_FAKE_PROVIDER=1`
+  - `NOVEL_REAL_VERIFY_DRAFT_TEXT_FILE=E:/github/novel/changes/route-a-real-trigger-verification/runtime/happy/fake-draft.txt`
+  - `NOVEL_REAL_VERIFY_PROVIDER_CALL_LOG=E:/github/novel/changes/route-a-real-trigger-verification/runtime/provider-call.json`
+  - `NOVEL_LLM_PROVIDER=openai`
+  - `NOVEL_LLM_MODEL=gpt-4o-mini`
+  - `NOVEL_LLM_API_KEY=test-key`
+- Directory snapshot after success rerun:
+  - `changes/route-a-real-trigger-verification/runtime/happy/.novel_project_path`
+  - `changes/route-a-real-trigger-verification/runtime/happy/fake-draft-json.txt`
+  - `changes/route-a-real-trigger-verification/runtime/happy/fake-draft.txt`
+  - `changes/route-a-real-trigger-verification/runtime/happy/mybook/canonical_state.json`
+  - `changes/route-a-real-trigger-verification/runtime/happy/mybook/canonical_state.json.lock`
+  - `changes/route-a-real-trigger-verification/runtime/happy/mybook/chapters/chapter_1.md`
+  - `changes/route-a-real-trigger-verification/runtime/provider-call.json`
+
+## Structure gate
+- Command: `rtk "C:\Program Files\Git\usr\bin\bash.exe" tools/verify-structure.sh`
+- Exit code: `0`
+- Output:
+  ```
+  Verifying novel project structure...
+
+  Required paths:
+  PASS novel-cli/
+  PASS novel-cli/pyproject.toml
+  PASS novel-cli/novel_cli/
+  PASS novel-cli/novel_cli/main.py
+  PASS skills/novel-dev-sop/SKILL.md
+
+  Summary: PASS (0 failures)
+  ```

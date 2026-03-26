@@ -1,0 +1,28 @@
+Scenario: Harness remains inactive without the opt-in env switch
+Workspace: E:\github\novel
+Env:
+- PYTHONPATH=E:/github/novel/changes/route-a-real-trigger-verification/support
+- NOVEL_REAL_VERIFY_FAKE_PROVIDER unset
+- NOVEL_REAL_VERIFY_PROVIDER_CALL_LOG=E:/github/novel/changes/route-a-real-trigger-verification/runtime/provider-call-inactive.json
+
+COMMAND: ["C:/Users/daixu/AppData/Local/Programs/Python/Python312/Scripts/novel.exe", "--help"]
+EXIT: 0
+STDOUT:
+Usage: novel [OPTIONS] COMMAND [ARGS]...
+
+Options:
+  --version  Show the version and exit.
+  --json     Emit JSON output.
+  --help     Show this message and exit.
+
+Commands:
+  chapter
+  project
+  repl
+  snapshot
+  state
+  world
+
+STDERR:
+
+CALL_LOG_EXISTS: False

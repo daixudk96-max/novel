@@ -1,0 +1,7 @@
+# Task 3 no-project unseeded proof
+Workspace: runtime/no-project
+Intentional action: removed accidental verifybook seed; lane is intentionally unseeded again.
+### directory listing
+(empty)
+Has .novel_project_path: False
+Has canonical_state.json anywhere: False

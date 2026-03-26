@@ -1,0 +1,79 @@
+# Task 9 Verification Ledger
+
+## Stage / Check / Status / Evidence / Notes
+| Stage | Check | Status | Evidence | Notes |
+|---|---|---|---|---|
+| Task 1 | Packaged CLI preflight and explicit `novel.exe` proof | PASS | `changes/route-a-real-trigger-verification/evidence/task-1-packaged-preflight.txt`<br>`changes/route-a-real-trigger-verification/evidence/task-1-packaged-preflight-error.txt` | Python 3.12 Scripts `novel.exe` was resolved and used as the packaged proof target. |
+| Task 2 | Offline `sitecustomize.py` fake-provider harness | PASS | `changes/route-a-real-trigger-verification/evidence/task-2-fake-provider-harness.txt`<br>`changes/route-a-real-trigger-verification/evidence/task-2-fake-provider-harness-error.txt` | Harness stayed opt-in and kept packaged CLI startup offline. |
+| Task 3 | Deterministic Route A workspace bootstrap | PASS | `changes/route-a-real-trigger-verification/evidence/task-3-workspace-bootstrap.txt`<br>`changes/route-a-real-trigger-verification/evidence/task-3-workspace-bootstrap-error.txt` | Workspaces were isolated for no-project, no-entity, env-contract, happy, and redraft lanes. |
+| Task 4 | No-project and active-entity guard failures | PASS | `changes/route-a-real-trigger-verification/evidence/task-4-no-project-and-entity-guard.txt`<br>`changes/route-a-real-trigger-verification/evidence/task-4-no-project-and-entity-guard-error.txt` | Failure lanes stayed write-free for chapter files. |
+| Task 5 | Missing-provider and unsupported-provider fail-fast contracts | PASS | `changes/route-a-real-trigger-verification/evidence/task-5-provider-env-contract.txt`<br>`changes/route-a-real-trigger-verification/evidence/task-5-provider-env-contract-error.txt` | Provider selection failed before any chapter mutation. |
+| Task 6 | Missing-model and missing-API-key fail-fast contracts | PASS | `changes/route-a-real-trigger-verification/evidence/task-6-provider-missing-fields.txt`<br>`changes/route-a-real-trigger-verification/evidence/task-6-provider-missing-fields-error.txt` | Missing field checks stayed exact, including whitespace trimming. |
+| Task 7 | Happy-path plain-mode drafting and real file/state side effects | PASS | `changes/route-a-real-trigger-verification/evidence/task-7-happy-path-plain.txt`<br>`changes/route-a-real-trigger-verification/evidence/task-7-happy-path-plain-error.txt` | Fake-provider body, chapter file, state, and call log all matched. |
+| Task 8 | Happy-path JSON parity and repeat-draft `settled_at` reset | PASS | `changes/route-a-real-trigger-verification/evidence/task-8-happy-path-json-and-redraft.txt`<br>`changes/route-a-real-trigger-verification/evidence/task-8-happy-path-json-and-redraft-error.txt` | JSON mode matched plain semantics and redraft reset `settled_at` to `""`. |
+| Task 9 | Cleanup, repeatability, and verifier gate | PASS | `changes/route-a-real-trigger-verification/evidence/task-9-verification-ledger-error.txt`<br>`changes/route-a-real-trigger-verification/evidence/task-9-verification-ledger.txt` | Cleanup kept retained manifests, fake draft fixtures, and `runtime/provider-call.json`, then reran one failure, one success, and the structure gate. |
+
+## Cleanup summary
+- Removed during cleanup:
+  - `changes/route-a-real-trigger-verification/runtime/harness-smoke/.novel_project_path`
+  - `changes/route-a-real-trigger-verification/runtime/harness-smoke/mybook/canonical_state.json`
+  - `changes/route-a-real-trigger-verification/runtime/harness-smoke/mybook/canonical_state.json.lock`
+  - `changes/route-a-real-trigger-verification/runtime/harness-smoke/mybook/chapters/chapter_1.md`
+  - `changes/route-a-real-trigger-verification/runtime/happy/mybook/chapters/chapter_1.md`
+  - `changes/route-a-real-trigger-verification/runtime/happy/mybook/chapters/chapter_2.md`
+  - `changes/route-a-real-trigger-verification/runtime/redraft/mybook/chapters/chapter_1.md`
+- Retained after cleanup:
+  - `changes/route-a-real-trigger-verification/runtime/provider-call.json`
+  - `changes/route-a-real-trigger-verification/runtime/provider-draft.txt`
+  - `changes/route-a-real-trigger-verification/runtime/happy/fake-draft.txt`
+  - `changes/route-a-real-trigger-verification/runtime/happy/fake-draft-json.txt`
+  - `changes/route-a-real-trigger-verification/runtime/happy/.novel_project_path`
+  - `changes/route-a-real-trigger-verification/runtime/happy/mybook/canonical_state.json`
+  - `changes/route-a-real-trigger-verification/runtime/happy/mybook/canonical_state.json.lock`
+  - `changes/route-a-real-trigger-verification/runtime/redraft/.novel_project_path`
+  - `changes/route-a-real-trigger-verification/runtime/redraft/mybook/canonical_state.json`
+  - `changes/route-a-real-trigger-verification/runtime/redraft/mybook/canonical_state.json.lock`
+  - `changes/route-a-real-trigger-verification/runtime/env-contract/.novel_project_path`
+  - `changes/route-a-real-trigger-verification/runtime/env-contract/mybook/canonical_state.json`
+  - `changes/route-a-real-trigger-verification/runtime/env-contract/mybook/canonical_state.json.lock`
+  - `changes/route-a-real-trigger-verification/runtime/no-entity/.novel_project_path`
+  - `changes/route-a-real-trigger-verification/runtime/no-entity/mybook/canonical_state.json`
+  - `changes/route-a-real-trigger-verification/runtime/no-entity/mybook/canonical_state.json.lock`
+  - `changes/route-a-real-trigger-verification/runtime/harness-smoke/.gitkeep`
+
+## Representative reruns after cleanup
+- Failure rerun
+  - Command: `C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe --json chapter draft --chapter 1`
+  - Cwd: `changes\route-a-real-trigger-verification\runtime\no-entity`
+  - Exit code: `1`
+  - Stdout: `{"code": 1, "error": "chapter 1 draft requires at least one active world entity"}`
+  - Stderr: empty
+  - Result: exact failure remained after cleanup, and no chapter file was created in `runtime/no-entity`.
+- Success rerun
+  - Command: `C:/Users/daixu/AppData/Local/Programs/Python/Python312/Scripts/novel.exe chapter draft --chapter 1`
+  - Cwd: `E:/github/novel/changes/route-a-real-trigger-verification/runtime/happy`
+  - Env: `PYTHONPATH=E:/github/novel/changes/route-a-real-trigger-verification/support`, `NOVEL_REAL_VERIFY_FAKE_PROVIDER=1`, `NOVEL_REAL_VERIFY_DRAFT_TEXT_FILE=E:/github/novel/changes/route-a-real-trigger-verification/runtime/happy/fake-draft.txt`, `NOVEL_REAL_VERIFY_PROVIDER_CALL_LOG=E:/github/novel/changes/route-a-real-trigger-verification/runtime/provider-call.json`, `NOVEL_LLM_PROVIDER=openai`, `NOVEL_LLM_MODEL=gpt-4o-mini`, `NOVEL_LLM_API_KEY=test-key`
+  - Exit code: `0`
+  - Stdout: `Drafted chapter 1 at E:\github\novel\changes\route-a-real-trigger-verification\runtime\happy\mybook\chapters\chapter_1.md`
+  - Stderr: empty
+  - Result: cleanup did not break the offline success path, and chapter 1 was recreated.
+
+## Structure gate
+- Command: `rtk "C:\Program Files\Git\usr\bin\bash.exe" tools/verify-structure.sh`
+- Output:
+  ```
+  Verifying novel project structure...
+
+  Required paths:
+  PASS novel-cli/
+  PASS novel-cli/pyproject.toml
+  PASS novel-cli/novel_cli/
+  PASS novel-cli/novel_cli/main.py
+  PASS skills/novel-dev-sop/SKILL.md
+
+  Summary: PASS (0 failures)
+  ```
+
+## Evidence chain note
+- `changes/route-a-real-trigger-verification/evidence/task-9-verification-ledger-error.txt` is the cleanup and rerun transcript.
+- `runtime/provider-call.json` stayed in place and was refreshed by the success rerun.

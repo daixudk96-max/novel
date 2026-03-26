@@ -1,0 +1,162 @@
+# Task 3 workspace bootstrap transcript
+novel.exe: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe
+
+## workspace: no-entity
+$ novel.exe project init mybook --genre fantasy
+Initialized project 'mybook' at E:\github\novel\changes\route-a-real-trigger-verification\runtime\no-entity\mybook
+### directory tree
+.novel_project_path
+mybook
+mybook\canonical_state.json
+mybook\canonical_state.json.lock
+### .novel_project_path
+E:\github\novel\changes\route-a-real-trigger-verification\runtime\no-entity\mybook
+### canonical_state.json
+{
+  "version": 1,
+  "project": {
+    "name": "mybook",
+    "genre": "fantasy",
+    "created_at": "2026-03-25T07:33:22Z"
+  },
+  "world": {
+    "entities": [],
+    "relationships": []
+  },
+  "timeline": {
+    "current_chapter": 0,
+    "events": []
+  },
+  "foreshadows": [],
+  "chapters": []
+}
+
+
+## workspace: env-contract
+$ novel.exe project init mybook --genre fantasy
+Initialized project 'mybook' at E:\github\novel\changes\route-a-real-trigger-verification\runtime\env-contract\mybook
+$ novel.exe world entity add --name Mira --type character --attributes {"role": "lead"}
+Added entity 'Mira' (entity-1)
+### directory tree
+.novel_project_path
+mybook
+mybook\canonical_state.json
+mybook\canonical_state.json.lock
+### .novel_project_path
+E:\github\novel\changes\route-a-real-trigger-verification\runtime\env-contract\mybook
+### canonical_state.json
+{
+  "version": 1,
+  "project": {
+    "name": "mybook",
+    "genre": "fantasy",
+    "created_at": "2026-03-25T07:33:23Z"
+  },
+  "world": {
+    "entities": [
+      {
+        "id": "entity-1",
+        "name": "Mira",
+        "type": "character",
+        "attributes": {
+          "role": "lead"
+        },
+        "visibility": "active"
+      }
+    ],
+    "relationships": []
+  },
+  "timeline": {
+    "current_chapter": 0,
+    "events": []
+  },
+  "foreshadows": [],
+  "chapters": []
+}
+
+
+## workspace: happy
+$ novel.exe project init mybook --genre fantasy
+Initialized project 'mybook' at E:\github\novel\changes\route-a-real-trigger-verification\runtime\happy\mybook
+$ novel.exe world entity add --name Mira --type character --attributes {"role": "lead"}
+Added entity 'Mira' (entity-1)
+### directory tree
+.novel_project_path
+mybook
+mybook\canonical_state.json
+mybook\canonical_state.json.lock
+### .novel_project_path
+E:\github\novel\changes\route-a-real-trigger-verification\runtime\happy\mybook
+### canonical_state.json
+{
+  "version": 1,
+  "project": {
+    "name": "mybook",
+    "genre": "fantasy",
+    "created_at": "2026-03-25T07:33:24Z"
+  },
+  "world": {
+    "entities": [
+      {
+        "id": "entity-1",
+        "name": "Mira",
+        "type": "character",
+        "attributes": {
+          "role": "lead"
+        },
+        "visibility": "active"
+      }
+    ],
+    "relationships": []
+  },
+  "timeline": {
+    "current_chapter": 0,
+    "events": []
+  },
+  "foreshadows": [],
+  "chapters": []
+}
+
+
+## workspace: redraft
+$ novel.exe project init mybook --genre fantasy
+Initialized project 'mybook' at E:\github\novel\changes\route-a-real-trigger-verification\runtime\redraft\mybook
+$ novel.exe world entity add --name Mira --type character --attributes {"role": "lead"}
+Added entity 'Mira' (entity-1)
+### directory tree
+.novel_project_path
+mybook
+mybook\canonical_state.json
+mybook\canonical_state.json.lock
+### .novel_project_path
+E:\github\novel\changes\route-a-real-trigger-verification\runtime\redraft\mybook
+### canonical_state.json
+{
+  "version": 1,
+  "project": {
+    "name": "mybook",
+    "genre": "fantasy",
+    "created_at": "2026-03-25T07:33:25Z"
+  },
+  "world": {
+    "entities": [
+      {
+        "id": "entity-1",
+        "name": "Mira",
+        "type": "character",
+        "attributes": {
+          "role": "lead"
+        },
+        "visibility": "active"
+      }
+    ],
+    "relationships": []
+  },
+  "timeline": {
+    "current_chapter": 0,
+    "events": []
+  },
+  "foreshadows": [],
+  "chapters": []
+}
+

@@ -1,0 +1,18 @@
+Task 4 — post-failure state assertions
+
+runtime/no-entity checks after plain and JSON failures
+- File inspected: E:\github\novel\changes\route-a-real-trigger-verification\runtime\no-entity\mybook\canonical_state.json
+- world.entities: []
+- chapters: []
+- Assertion: chapters remained [] after both failures.
+- Assertion: E:\github\novel\changes\route-a-real-trigger-verification\runtime\no-entity\mybook\chapters\chapter_1.md is absent.
+
+runtime/no-project checks after JSON failure
+- Directory inspected: E:\github\novel\changes\route-a-real-trigger-verification\runtime\no-project
+- Directory entries: <empty>
+- Assertion: runtime/no-project still lacks .novel_project_path.
+- Assertion: runtime/no-project still lacks mybook/.
+- Assertion: runtime/no-project still lacks mybook/chapters/chapter_1.md.
+
+Result:
+- PASS: both failure lanes remained side-effect free for Task 4's project-selection and active-entity guards.

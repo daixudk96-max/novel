@@ -1,0 +1,35 @@
+Task 4 — no-project and active-entity guard failures through packaged CLI entrypoints
+
+Packaged entrypoint:
+- C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe
+
+Scenario 1: runtime/no-project JSON failure
+- Working directory: E:\github\novel\changes\route-a-real-trigger-verification\runtime\no-project
+- Command: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe --json chapter draft --chapter 1
+- Exit code: 1
+- stdout: {"code": 1, "error": "no novel project selected"}
+- stderr: <empty>
+- Post-command directory listing: <empty>
+- No-write assertion: mybook/chapters/chapter_1.md does not exist.
+
+Scenario 2: runtime/no-entity plain failure
+- Working directory: E:\github\novel\changes\route-a-real-trigger-verification\runtime\no-entity
+- Command: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe chapter draft --chapter 1
+- Exit code: 1
+- stdout: <empty>
+- stderr: Error: chapter 1 draft requires at least one active world entity
+- Visible output contract: Error: chapter 1 draft requires at least one active world entity
+- Post-command directory entries: .novel_project_path, mybook/
+- No-write assertion: mybook/chapters/chapter_1.md does not exist.
+
+Scenario 3: runtime/no-entity JSON failure
+- Working directory: E:\github\novel\changes\route-a-real-trigger-verification\runtime\no-entity
+- Command: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe --json chapter draft --chapter 1
+- Exit code: 1
+- stdout: {"code": 1, "error": "chapter 1 draft requires at least one active world entity"}
+- stderr: <empty>
+- Post-command directory entries: .novel_project_path, mybook/
+- No-write assertion: mybook/chapters/chapter_1.md does not exist.
+
+Result:
+- PASS: all packaged CLI guard checks failed with exit code 1 before any chapter draft file write.

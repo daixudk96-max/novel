@@ -1,0 +1,25 @@
+Task 1 — non-canonical packaged proof guardrail
+Date: 2026-03-25
+Working directory: E:/github/novel
+
+Supplementary command recorded:
+py -3.12 -m novel_cli.main --help
+
+Observed output captured from `cmd /c "py -3.12 -m novel_cli.main --help"`:
+Microsoft Windows [版本 10.0.26200.7623]
+(c) Microsoft Corporation。保留所有权利。
+
+E:\github\novel>
+
+Assessment:
+- This module invocation is supplementary only.
+- It cannot replace packaged-console-script proof because it bypasses the explicit installed Scripts-path entrypoint check required by:
+  - `changes/agent-callable-novel-cli/verification.md:93-97`
+  - `skills/novel-dev-sop/references/sop-publish.md:18-20`
+- Task 1 remains PASS only because the explicit Python 3.12 Scripts path was separately resolved and proven:
+  - `C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe --help`
+
+Rule:
+- `py -3.12 -m novel_cli.main --help` is not accepted packaged-CLI proof by itself.
+- Bare `novel --help` is not accepted packaged-CLI proof by itself.
+- Only the explicit `sysconfig.get_path('scripts') / 'novel.exe'` target satisfies the packaged-console-script-first requirement for this plan.

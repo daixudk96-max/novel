@@ -1,0 +1,84 @@
+Task 8 happy-path JSON parity verification
+
+Scenario
+  JSON-mode success matches plain-mode semantics.
+
+Command
+  cwd: E:\github\novel\changes\route-a-real-trigger-verification\runtime\happy
+  exe: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe
+  argv: --json chapter draft --chapter 2
+
+Environment
+  PYTHONPATH=E:/github/novel/changes/route-a-real-trigger-verification/support
+  NOVEL_REAL_VERIFY_FAKE_PROVIDER=1
+  NOVEL_REAL_VERIFY_DRAFT_TEXT_FILE=E:\github\novel\changes\route-a-real-trigger-verification\runtime\happy\fake-draft-json.txt
+  NOVEL_REAL_VERIFY_PROVIDER_CALL_LOG=E:\github\novel\changes\route-a-real-trigger-verification\runtime\provider-call.json
+  NOVEL_LLM_PROVIDER=openai
+  NOVEL_LLM_MODEL=gpt-4o-mini
+  NOVEL_LLM_API_KEY=test-key
+
+Process Result
+  exit_code: 0
+  stdout:
+    {"chapter": 2, "title": "Chapter 2", "status": "draft", "path": "E:\\github\\novel\\changes\\route-a-real-trigger-verification\\runtime\\happy\\mybook\\chapters\\chapter_2.md", "summary": "Mira takes the next step."}
+  stderr:
+
+JSON Payload
+  chapter: 2
+  title: Chapter 2
+  status: draft
+  summary: Mira takes the next step.
+  path: E:\github\novel\changes\route-a-real-trigger-verification\runtime\happy\mybook\chapters\chapter_2.md
+  path_is_absolute: True
+  payload_keys: [chapter, path, status, summary, title]
+
+Files
+  sentinel_path: E:\github\novel\changes\route-a-real-trigger-verification\runtime\happy\fake-draft-json.txt
+  sentinel_contents:
+    Provider-backed JSON draft body.
+  chapter_path: E:\github\novel\changes\route-a-real-trigger-verification\runtime\happy\mybook\chapters\chapter_2.md
+  chapter_contents:
+    Provider-backed JSON draft body.
+  canonical_state_path: E:\github\novel\changes\route-a-real-trigger-verification\runtime\happy\mybook\canonical_state.json
+  canonical_state_chapters:
+    [
+      {"number": 1, "title": "Chapter 1", "status": "draft", "summary": "Mira takes the next step.", "settled_at": ""},
+      {"number": 2, "title": "Chapter 2", "status": "draft", "summary": "Mira takes the next step.", "settled_at": ""}
+    ]
+  provider_call_log_path: E:\github\novel\changes\route-a-real-trigger-verification\runtime\provider-call.json
+  provider_call_log_json:
+    {"prompt": "Draft Chapter 2 about Mira. Summary: Mira takes the next step.", "temperature": 1.0}
+
+Semantic Parity Against Task 7 Plain Run
+  baseline_evidence: changes/route-a-real-trigger-verification/evidence/task-7-happy-path-plain.txt
+  plain_mode_contract:
+    - packaged novel.exe exited 0
+    - file write occurred at an absolute chapter path
+    - chapter metadata persisted as number/title/status/summary/settled_at
+    - status remained draft
+    - summary remained Mira takes the next step.
+    - settled_at remained empty
+    - provider call logged exact prompt and temperature 1.0
+  json_mode_contract:
+    - packaged novel.exe exited 0
+    - JSON payload exposed chapter/title/status/summary/path
+    - file write occurred at an absolute chapter path
+    - persisted chapter 2 metadata uses the same draft contract fields
+    - status remained draft
+    - summary remained Mira takes the next step.
+    - settled_at remained empty
+    - provider call logged exact prompt and temperature 1.0
+  parity_decision:
+    PASS - plain mode and JSON mode are semantically equivalent on success contract; only representation differs (plain success line vs JSON payload) and the chapter-specific values differ as expected for chapter 1 vs chapter 2.
+
+Assertions
+  - exit_code: PASS | actual=0 | expected=0
+  - payload_keys: PASS | actual=[chapter, path, status, summary, title] | expected contains chapter/title/status/summary/path
+  - payload_path_absolute: PASS | actual=True | expected=True
+  - chapter_text: PASS | actual='Provider-backed JSON draft body.' | expected='Provider-backed JSON draft body.'
+  - chapter_2_record: PASS | actual={"number": 2, "title": "Chapter 2", "status": "draft", "summary": "Mira takes the next step.", "settled_at": ""} | expected={"number": 2, "title": "Chapter 2", "status": "draft", "summary": "Mira takes the next step.", "settled_at": ""}
+  - provider_prompt: PASS | actual='Draft Chapter 2 about Mira. Summary: Mira takes the next step.' | expected='Draft Chapter 2 about Mira. Summary: Mira takes the next step.'
+  - provider_temperature: PASS | actual=1.0 | expected=1.0
+  - semantic_parity_vs_plain: PASS | actual='equivalent success semantics' | expected='equivalent success semantics'
+
+Overall: PASS

@@ -1,0 +1,16 @@
+Task 6 — whitespace-only model normalization edge
+Date: 2026-03-25
+Workspace: changes/route-a-real-trigger-verification/runtime/env-contract
+Packaged entrypoint: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe
+
+Case: whitespace_model_plain
+Env: NOVEL_LLM_PROVIDER=openai; NOVEL_LLM_MODEL='   '; NOVEL_LLM_API_KEY=test-key
+Command: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe chapter draft --chapter 1
+Exit code: 1
+stdout: <empty>
+stderr: Error: NOVEL_LLM_MODEL is required when NOVEL_LLM_PROVIDER='openai'
+
+No-write assertions after the whitespace-model command:
+- runtime/env-contract/mybook/chapters/chapter_1.md: does not exist
+- runtime/env-contract/mybook directory entries: canonical_state.json, canonical_state.json.lock
+- runtime/env-contract/mybook/canonical_state.json: chapters remains []

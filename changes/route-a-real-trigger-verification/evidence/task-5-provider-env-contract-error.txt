@@ -1,0 +1,46 @@
+Task 5 — Provider-selection post-failure state assertions
+Date: 2026-03-25
+Workspace: changes/route-a-real-trigger-verification/runtime/env-contract/
+
+Observed file checks
+- `changes/route-a-real-trigger-verification/runtime/env-contract/mybook/chapters/chapter_1.md`: absent
+- `changes/route-a-real-trigger-verification/runtime/env-contract/mybook/` directory entries:
+  - canonical_state.json
+  - canonical_state.json.lock
+
+Observed canonical state
+```json
+{
+  "version": 1,
+  "project": {
+    "name": "mybook",
+    "genre": "fantasy",
+    "created_at": "2026-03-25T07:33:23Z"
+  },
+  "world": {
+    "entities": [
+      {
+        "id": "entity-1",
+        "name": "Mira",
+        "type": "character",
+        "attributes": {
+          "role": "lead"
+        },
+        "visibility": "active"
+      }
+    ],
+    "relationships": []
+  },
+  "timeline": {
+    "current_chapter": 0,
+    "events": []
+  },
+  "foreshadows": [],
+  "chapters": []
+}
+```
+
+Assertions
+- `chapters` remains `[]` after all four provider-selection failures.
+- Active entity `Mira` remains present, confirming the lane stayed on the provider-resolution path.
+- No chapter markdown file or chapter metadata was partially written.

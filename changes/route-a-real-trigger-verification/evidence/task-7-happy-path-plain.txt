@@ -1,0 +1,83 @@
+Task 7 happy-path plain-mode verification
+
+Command
+  cwd: E:\github\novel\changes\route-a-real-trigger-verification\runtime\happy
+  exe: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe
+  argv: chapter draft --chapter 1
+
+Environment
+  PYTHONPATH=E:/github/novel/changes/route-a-real-trigger-verification/support
+  NOVEL_REAL_VERIFY_FAKE_PROVIDER=1
+  NOVEL_REAL_VERIFY_DRAFT_TEXT_FILE=E:\github\novel\changes\route-a-real-trigger-verification\runtime\happy\fake-draft.txt
+  NOVEL_REAL_VERIFY_PROVIDER_CALL_LOG=E:\github\novel\changes\route-a-real-trigger-verification\runtime\provider-call.json
+  NOVEL_LLM_PROVIDER=openai
+  NOVEL_LLM_MODEL=gpt-4o-mini
+  NOVEL_LLM_API_KEY=test-key
+
+Process Result
+  exit_code: 0
+  stdout:
+    Drafted chapter 1 at E:\github\novel\changes\route-a-real-trigger-verification\runtime\happy\mybook\chapters\chapter_1.md
+  stderr:
+    
+
+Files
+  chapter_path: E:\github\novel\changes\route-a-real-trigger-verification\runtime\happy\mybook\chapters\chapter_1.md
+  chapter_contents:
+    Provider-backed draft body.
+  canonical_state_path: E:\github\novel\changes\route-a-real-trigger-verification\runtime\happy\mybook\canonical_state.json
+  canonical_state_json:
+    {
+      "version": 1,
+      "project": {
+        "name": "mybook",
+        "genre": "fantasy",
+        "created_at": "2026-03-25T07:33:24Z"
+      },
+      "world": {
+        "entities": [
+          {
+            "id": "entity-1",
+            "name": "Mira",
+            "type": "character",
+            "attributes": {
+              "role": "lead"
+            },
+            "visibility": "active"
+          }
+        ],
+        "relationships": []
+      },
+      "timeline": {
+        "current_chapter": 0,
+        "events": []
+      },
+      "foreshadows": [],
+      "chapters": [
+        {
+          "number": 1,
+          "title": "Chapter 1",
+          "status": "draft",
+          "summary": "Mira takes the next step.",
+          "settled_at": ""
+        }
+      ]
+    }
+  provider_call_log_path: E:\github\novel\changes\route-a-real-trigger-verification\runtime\provider-call.json
+  provider_call_log_json:
+    {
+      "prompt": "Draft Chapter 1 about Mira. Summary: Mira takes the next step.",
+      "temperature": 1.0
+    }
+
+Assertions
+  - exit_code: PASS | actual=0 | expected=0
+  - stdout: PASS | actual='Drafted chapter 1 at E:\\github\\novel\\changes\\route-a-real-trigger-verification\\runtime\\happy\\mybook\\chapters\\chapter_1.md\n' | expected='Drafted chapter 1 at E:\\github\\novel\\changes\\route-a-real-trigger-verification\\runtime\\happy\\mybook\\chapters\\chapter_1.md\n'
+  - stderr: PASS | actual='' | expected=''
+  - chapter_text: PASS | actual='Provider-backed draft body.' | expected='Provider-backed draft body.'
+  - chapters: PASS | actual=[{'number': 1, 'title': 'Chapter 1', 'status': 'draft', 'summary': 'Mira takes the next step.', 'settled_at': ''}] | expected=[{'number': 1, 'title': 'Chapter 1', 'status': 'draft', 'summary': 'Mira takes the next step.', 'settled_at': ''}]
+  - provider_prompt: PASS | actual='Draft Chapter 1 about Mira. Summary: Mira takes the next step.' | expected='Draft Chapter 1 about Mira. Summary: Mira takes the next step.'
+  - provider_temperature: PASS | actual=1.0 | expected=1.0
+  - placeholder_mismatch: PASS | actual=False | expected=False
+
+Overall: PASS

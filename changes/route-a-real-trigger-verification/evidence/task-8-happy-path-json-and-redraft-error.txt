@@ -1,0 +1,57 @@
+Task 8 redraft settled_at reset verification
+
+Scenario
+  Redraft resets settled timestamp on an existing chapter record.
+
+Preseeded State Before Command
+  canonical_state_path: E:\github\novel\changes\route-a-real-trigger-verification\runtime\redraft\mybook\canonical_state.json
+  chapter_1_before:
+    {"number": 1, "title": "Arrival", "status": "settled", "summary": "Old settled summary.", "settled_at": "2026-03-22T12:34:56Z"}
+
+Command
+  cwd: E:\github\novel\changes\route-a-real-trigger-verification\runtime\redraft
+  exe: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe
+  argv: chapter draft --chapter 1
+
+Environment
+  PYTHONPATH=E:/github/novel/changes/route-a-real-trigger-verification/support
+  NOVEL_REAL_VERIFY_FAKE_PROVIDER=1
+  NOVEL_REAL_VERIFY_DRAFT_TEXT_FILE=E:\github\novel\changes\route-a-real-trigger-verification\runtime\happy\fake-draft.txt
+  NOVEL_REAL_VERIFY_PROVIDER_CALL_LOG=E:\github\novel\changes\route-a-real-trigger-verification\runtime\provider-call.json
+  NOVEL_LLM_PROVIDER=openai
+  NOVEL_LLM_MODEL=gpt-4o-mini
+  NOVEL_LLM_API_KEY=test-key
+
+Process Result
+  exit_code: 0
+  stdout:
+    Drafted chapter 1 at E:\github\novel\changes\route-a-real-trigger-verification\runtime\redraft\mybook\chapters\chapter_1.md
+  stderr:
+
+Files After Command
+  chapter_path: E:\github\novel\changes\route-a-real-trigger-verification\runtime\redraft\mybook\chapters\chapter_1.md
+  chapter_contents:
+    Provider-backed draft body.
+  canonical_state_path: E:\github\novel\changes\route-a-real-trigger-verification\runtime\redraft\mybook\canonical_state.json
+  chapter_1_after:
+    {"number": 1, "title": "Chapter 1", "status": "draft", "summary": "Mira takes the next step.", "settled_at": ""}
+  provider_call_log_path: E:\github\novel\changes\route-a-real-trigger-verification\runtime\provider-call.json
+  provider_call_log_json:
+    {"prompt": "Draft Chapter 1 about Mira. Summary: Mira takes the next step.", "temperature": 1.0}
+
+Mutation Decision
+  PASS - packaged redraft preserved chapter 1, replaced settled metadata with the draft contract, and reset settled_at from 2026-03-22T12:34:56Z to an empty string exactly as _upsert_chapter() requires.
+
+Assertions
+  - exit_code: PASS | actual=0 | expected=0
+  - stdout_path: PASS | actual='Drafted chapter 1 at E:\github\novel\changes\route-a-real-trigger-verification\runtime\redraft\mybook\chapters\chapter_1.md\n' | expected='Drafted chapter 1 at E:\github\novel\changes\route-a-real-trigger-verification\runtime\redraft\mybook\chapters\chapter_1.md\n'
+  - before_status: PASS | actual='settled' | expected='settled'
+  - before_settled_at: PASS | actual='2026-03-22T12:34:56Z' | expected='2026-03-22T12:34:56Z'
+  - after_status: PASS | actual='draft' | expected='draft'
+  - after_summary: PASS | actual='Mira takes the next step.' | expected='Mira takes the next step.'
+  - after_settled_at: PASS | actual='' | expected=''
+  - chapter_text: PASS | actual='Provider-backed draft body.' | expected='Provider-backed draft body.'
+  - provider_prompt: PASS | actual='Draft Chapter 1 about Mira. Summary: Mira takes the next step.' | expected='Draft Chapter 1 about Mira. Summary: Mira takes the next step.'
+  - provider_temperature: PASS | actual=1.0 | expected=1.0
+
+Overall: PASS

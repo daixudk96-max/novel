@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "project": {
+    "name": "mybook",
+    "genre": "fantasy",
+    "created_at": "2026-03-25T07:33:25Z"
+  },
+  "world": {
+    "entities": [
+      {
+        "id": "entity-1",
+        "name": "Mira",
+        "type": "character",
+        "attributes": {
+          "role": "lead"
+        },
+        "visibility": "active"
+      }
+    ],
+    "relationships": []
+  },
+  "timeline": {
+    "current_chapter": 0,
+    "events": []
+  },
+  "foreshadows": [],
+  "chapters": [
+    {
+      "number": 1,
+      "title": "Chapter 1",
+      "status": "draft",
+      "summary": "Mira takes the next step.",
+      "settled_at": ""
+    }
+  ]
+}
