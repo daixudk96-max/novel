@@ -1,0 +1,6 @@
+## Progress
+
+- 2026-03-27: Narrowed `AssistantResultValidator` forbidden-path checks to exact resolved targets for the selected project `canonical_state.json` and caller workspace `.novel_project_path`, and added regression coverage proving same-basename files elsewhere remain valid.
+- 2026-03-27: Re-ran Final Verification Wave F3 against the current worktree with explicit worktree imports and approved Route B phase 1. Manual QA confirmed `chapter guide -> chapter verify-guided-result -> chapter settle` is coherent, provider-free, and fails before mutation when validation is bypassed; the earlier downstream JSON-envelope concern was removed as out of scope per the written plan.
+- 2026-03-27: Trimmed proposal drift so it now reflects the shipped Route B phase-1 state without stale sync-language or historical `chapter-guidance/v1` vocabulary.
+- 2026-03-27: Final Verification Wave closed green: F1/F2/F3/F4 all approved after the validator exact-target fix and proposal wording cleanup; directory diagnostics were clean, `rtk py -3.12 -m pytest -q` passed with `123 passed`, and a fresh explicit Route B CLI flow (`chapter guide -> chapter verify-guided-result -> chapter settle -> state show`) succeeded against the merged worktree package.
