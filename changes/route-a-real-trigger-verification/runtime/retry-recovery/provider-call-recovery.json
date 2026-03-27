@@ -1,0 +1,18 @@
+{
+  "prompt": "Draft Chapter 1 about Mira. Summary: Mira takes the next step.",
+  "temperature": 1.0,
+  "attempt_count": 2,
+  "attempts": [
+    {
+      "attempt": 1,
+      "outcome": "APIConnectionError",
+      "raised": "APIConnectionError",
+      "message": "simulated APIConnectionError on attempt 1"
+    },
+    {
+      "attempt": 2,
+      "outcome": "success",
+      "result": "success"
+    }
+  ]
+}

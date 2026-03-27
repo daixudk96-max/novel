@@ -4,6 +4,8 @@ import os
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Protocol
 
+from novel_runtime.llm.resilience import route_a_provider_sdk_options
+
 
 SUPPORTED_ROUTE_A_PROVIDER = "openai"
 
@@ -93,7 +95,7 @@ def _normalize_value(value: str | None) -> str:
 def _build_openai_client(config: RouteAProviderConfig):
     from openai import OpenAI
 
-    return OpenAI(api_key=config.api_key)
+    return OpenAI(api_key=config.api_key, **route_a_provider_sdk_options())
 
 
 def _extract_openai_message_content(response: object) -> str:

@@ -3,6 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
+from novel_runtime.llm.resilience import (
+    ROUTE_A_PROVIDER_MAX_ATTEMPTS,
+    classify_route_a_provider_error,
+    is_route_a_retryable_provider_error,
+    run_with_route_a_provider_resilience,
+)
 from novel_runtime.llm.provider import RouteAProvider, build_route_a_provider
 from novel_runtime.llm.temperature import (
     DEFAULT_DRAFT_TEMPERATURE,
@@ -67,13 +73,23 @@ class ChapterDrafter:
         prompt = (
             f"Draft Chapter {chapter_number} about {entity_name}. Summary: {summary}"
         )
+        provider = self._resolve_provider()
 
         try:
-            content = self._resolve_provider().draft(
-                prompt=prompt,
-                temperature=self._temperature,
+            content = run_with_route_a_provider_resilience(
+                lambda: provider.draft(
+                    prompt=prompt,
+                    temperature=self._temperature,
+                )
             )
         except Exception as exc:
+            if is_route_a_retryable_provider_error(exc):
+                raise ValueError(
+                    f"chapter draft failed after {ROUTE_A_PROVIDER_MAX_ATTEMPTS} attempts: {exc}"
+                ) from exc
+            decision = classify_route_a_provider_error(exc)
+            if decision.reason == "invalid_request":
+                raise ValueError(str(exc)) from exc
             raise ValueError(
                 f"chapter {chapter_number} draft provider failed: {exc}"
             ) from exc

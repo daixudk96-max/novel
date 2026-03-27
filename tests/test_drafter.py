@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import importlib
 import math
+from typing import Any
 
 import pytest
-
-from novel_runtime.state.canonical import CanonicalState
 
 
 class _FakeProvider:
@@ -50,6 +49,27 @@ class _FakeCompletionMessage:
         self.content = content
 
 
+RateLimitError = type("RateLimitError", (Exception,), {"status_code": 429})
+APIConnectionError = type("APIConnectionError", (Exception,), {})
+InternalServerError = type("InternalServerError", (Exception,), {"status_code": 503})
+AuthenticationError = type("AuthenticationError", (Exception,), {"status_code": 401})
+UnsupportedProviderError = type("UnsupportedProviderError", (Exception,), {})
+
+
+class _FakeProviderOperation:
+    def __init__(self, *results: object) -> None:
+        self._results = list(results)
+        self.calls = 0
+
+    def __call__(self) -> str:
+        self.calls += 1
+        result = self._results.pop(0)
+        if isinstance(result, BaseException):
+            raise result
+        assert isinstance(result, str)
+        return result
+
+
 def test_draft_returns_structured_chapter_result() -> None:
     drafter_module = _load_drafter_module()
     provider = _FakeProvider("Chapter body from provider.")
@@ -76,7 +96,7 @@ def test_draft_requires_active_world_entity() -> None:
         ValueError, match="chapter 1 draft requires at least one active world entity"
     ):
         drafter_module.ChapterDrafter().draft(
-            CanonicalState.create_empty("Example Novel", "fantasy"),
+            _load_canonical_state_class().create_empty("Example Novel", "fantasy"),
             1,
         )
 
@@ -90,7 +110,7 @@ def test_draft_failure_requires_integer_chapter_number() -> None:
 
 def test_draft_failure_ignores_active_entities_with_blank_names() -> None:
     drafter_module = _load_drafter_module()
-    state = CanonicalState.create_empty("Example Novel", "fantasy")
+    state = _load_canonical_state_class().create_empty("Example Novel", "fantasy")
     state.data["world"]["entities"].extend(
         [
             {
@@ -192,6 +212,95 @@ def test_draft_failure_wraps_provider_exceptions_deterministically() -> None:
         )
 
 
+def test_resilience_classifies_retryable_provider_failures() -> None:
+    resilience_module = _load_resilience_module()
+
+    assert resilience_module.classify_route_a_provider_error(
+        RateLimitError("slow down")
+    ) == resilience_module.RouteAResilienceDecision(
+        resilience_module.RouteAErrorDisposition.RETRYABLE,
+        "RateLimitError",
+    )
+    assert resilience_module.classify_route_a_provider_error(
+        APIConnectionError("reset")
+    ) == resilience_module.RouteAResilienceDecision(
+        resilience_module.RouteAErrorDisposition.RETRYABLE,
+        "APIConnectionError",
+    )
+    assert resilience_module.classify_route_a_provider_error(
+        InternalServerError("overloaded")
+    ) == resilience_module.RouteAResilienceDecision(
+        resilience_module.RouteAErrorDisposition.RETRYABLE,
+        "InternalServerError",
+    )
+
+
+def test_resilience_classifies_fail_fast_provider_failures() -> None:
+    resilience_module = _load_resilience_module()
+
+    assert resilience_module.classify_route_a_provider_error(
+        ValueError("invalid prompt")
+    ) == resilience_module.RouteAResilienceDecision(
+        resilience_module.RouteAErrorDisposition.FAIL_FAST,
+        "invalid_request",
+    )
+    assert resilience_module.classify_route_a_provider_error(
+        AuthenticationError("bad key")
+    ) == resilience_module.RouteAResilienceDecision(
+        resilience_module.RouteAErrorDisposition.FAIL_FAST,
+        "AuthenticationError",
+    )
+    assert resilience_module.classify_route_a_provider_error(
+        UnsupportedProviderError("unsupported")
+    ) == resilience_module.RouteAResilienceDecision(
+        resilience_module.RouteAErrorDisposition.FAIL_FAST,
+        "UnsupportedProviderError",
+    )
+
+
+def test_resilience_retries_provider_operation_with_deterministic_backoff() -> None:
+    resilience_module = _load_resilience_module()
+    operation = _FakeProviderOperation(
+        RateLimitError("slow down"),
+        APIConnectionError("reset"),
+        "draft recovered",
+    )
+    sleeps: list[float] = []
+
+    result = resilience_module.run_with_route_a_provider_resilience(
+        operation,
+        sleep=sleeps.append,
+    )
+
+    assert result == "draft recovered"
+    assert operation.calls == 3
+    assert sleeps == [0.1, 0.2]
+
+
+def test_resilience_fails_fast_without_sleeping_for_non_retryable_error() -> None:
+    resilience_module = _load_resilience_module()
+    operation = _FakeProviderOperation(AuthenticationError("bad key"))
+    sleeps: list[float] = []
+
+    with pytest.raises(AuthenticationError, match="bad key"):
+        resilience_module.run_with_route_a_provider_resilience(
+            operation,
+            sleep=sleeps.append,
+        )
+
+    assert operation.calls == 1
+    assert sleeps == []
+
+
+def test_resilience_exposes_fixed_provider_retry_contract_for_later_wiring() -> None:
+    resilience_module = _load_resilience_module()
+
+    assert resilience_module.ROUTE_A_PROVIDER_MAX_ATTEMPTS == 3
+    assert resilience_module.ROUTE_A_PROVIDER_BACKOFF_SECONDS == (0.1, 0.2)
+    assert resilience_module.ROUTE_A_PROVIDER_JITTER_ENABLED is False
+    assert resilience_module.route_a_provider_sdk_options() == {"max_retries": 0}
+
+
 def test_draft_requires_supported_route_a_provider_from_env() -> None:
     provider_module = _load_provider_module()
 
@@ -267,8 +376,26 @@ def _load_provider_module():
         )
 
 
-def _build_state() -> CanonicalState:
-    state = CanonicalState.create_empty("Example Novel", "fantasy")
+def _load_canonical_state_class() -> type[Any]:
+    try:
+        return importlib.import_module("novel_runtime.state.canonical").CanonicalState
+    except ModuleNotFoundError:
+        pytest.fail(
+            "novel_runtime.state.canonical module is required for the chapter draft MVP contract"
+        )
+
+
+def _load_resilience_module():
+    try:
+        return importlib.import_module("novel_runtime.llm.resilience")
+    except ModuleNotFoundError:
+        pytest.fail(
+            "novel_runtime.llm.resilience module is required for the Route A resilience contract"
+        )
+
+
+def _build_state():
+    state = _load_canonical_state_class().create_empty("Example Novel", "fantasy")
     state.data["world"]["entities"].append(
         {
             "id": "entity-1",

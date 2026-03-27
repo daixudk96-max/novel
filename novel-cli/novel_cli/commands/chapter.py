@@ -36,12 +36,7 @@ def draft_chapter(chapter_number: int, json_output: bool) -> None:
     except ValueError as exc:
         _raise_fail(str(exc), json_output)
 
-    chapter_path = project_dir / "chapters" / f"chapter_{chapter_number}.md"
-
-    chapter_path.parent.mkdir(parents=True, exist_ok=True)
-    chapter_path.write_text(draft.content, encoding="utf-8")
-    _upsert_chapter(state, draft)
-    state.save(project_dir)
+    chapter_path = _persist_draft(project_dir, state, draft)
 
     payload = {
         "chapter": draft.chapter,
@@ -341,6 +336,19 @@ def _load_state() -> tuple[CanonicalState, Path]:
 
 def _build_chapter_drafter() -> ChapterDrafter:
     return ChapterDrafter(provider=build_route_a_provider())
+
+
+def _persist_draft(
+    project_dir: Path,
+    state: CanonicalState,
+    draft: ChapterDraft,
+) -> Path:
+    chapter_path = project_dir / "chapters" / f"chapter_{draft.chapter}.md"
+    chapter_path.parent.mkdir(parents=True, exist_ok=True)
+    chapter_path.write_text(draft.content, encoding="utf-8")
+    _upsert_chapter(state, draft)
+    state.save(project_dir)
+    return chapter_path
 
 
 def _require_draft_entity(state: CanonicalState, chapter_number: int) -> None:

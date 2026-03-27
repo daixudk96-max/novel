@@ -1,0 +1,25 @@
+{
+  "prompt": "Draft Chapter 1 about Mira. Summary: Mira takes the next step.",
+  "temperature": 1.0,
+  "attempt_count": 3,
+  "attempts": [
+    {
+      "attempt": 1,
+      "outcome": "APIConnectionError",
+      "raised": "APIConnectionError",
+      "message": "simulated APIConnectionError on attempt 1"
+    },
+    {
+      "attempt": 2,
+      "outcome": "RateLimitError",
+      "raised": "RateLimitError",
+      "message": "simulated RateLimitError on attempt 2"
+    },
+    {
+      "attempt": 3,
+      "outcome": "InternalServerError",
+      "raised": "InternalServerError",
+      "message": "simulated InternalServerError on attempt 3"
+    }
+  ]
+}

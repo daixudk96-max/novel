@@ -1,0 +1,109 @@
+Task 4 packaged resilience recovery
+
+Workspace: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-recovery
+Packaged entrypoint: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe
+
+Environment
+  PYTHONPATH=E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\support;E:\github\novel-worktrees\roadmap-next-step\novel-cli;E:\github\novel-worktrees\roadmap-next-step\novel-runtime
+  NOVEL_LLM_PROVIDER=openai
+  NOVEL_LLM_MODEL=gpt-4o-mini
+  NOVEL_LLM_API_KEY=test-key
+  NOVEL_REAL_VERIFY_FAKE_PROVIDER=1
+  NOVEL_REAL_VERIFY_DRAFT_TEXT_FILE=E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-recovery\fake-draft-recovery.txt
+  NOVEL_REAL_VERIFY_PROVIDER_CALL_LOG=E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-recovery\provider-call-recovery.json
+  NOVEL_REAL_VERIFY_RETRY_SEQUENCE=APIConnectionError,success
+
+Commands
+  1. cwd: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-recovery
+     argv: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe project init mybook --genre fantasy
+     exit_code: 0
+     elapsed_seconds: 2.983
+     stdout: "Initialized project 'mybook' at E:\\github\\novel-worktrees\\roadmap-next-step\\changes\\route-a-real-trigger-verification\\runtime\\retry-recovery\\mybook\n"
+     stderr: ''
+  2. cwd: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-recovery
+     argv: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe world entity add --name Mira --type character --attributes {"role": "lead"}
+     exit_code: 0
+     elapsed_seconds: 2.586
+     stdout: "Added entity 'Mira' (entity-1)\n"
+     stderr: ''
+  3. cwd: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-recovery
+     argv: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe chapter draft --chapter 1
+     exit_code: 0
+     elapsed_seconds: 2.815
+     stdout: 'Drafted chapter 1 at E:\\github\\novel-worktrees\\roadmap-next-step\\changes\\route-a-real-trigger-verification\\runtime\\retry-recovery\\mybook\\chapters\\chapter_1.md\n'
+     stderr: ''
+
+Files
+  chapter_path: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-recovery\mybook\chapters\chapter_1.md
+  chapter_contents: Provider-backed recovery draft body.
+
+  canonical_state_path: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-recovery\mybook\canonical_state.json
+  canonical_state_json: {
+  "version": 1,
+  "project": {
+    "name": "mybook",
+    "genre": "fantasy",
+    "created_at": "2026-03-27T10:00:17Z"
+  },
+  "world": {
+    "entities": [
+      {
+        "id": "entity-1",
+        "name": "Mira",
+        "type": "character",
+        "attributes": {
+          "role": "lead"
+        },
+        "visibility": "active"
+      }
+    ],
+    "relationships": []
+  },
+  "timeline": {
+    "current_chapter": 0,
+    "events": []
+  },
+  "foreshadows": [],
+  "chapters": [
+    {
+      "number": 1,
+      "title": "Chapter 1",
+      "status": "draft",
+      "summary": "Mira takes the next step.",
+      "settled_at": ""
+    }
+  ]
+}
+  provider_call_log_path: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-recovery\provider-call-recovery.json
+  provider_call_log_json: {
+  "prompt": "Draft Chapter 1 about Mira. Summary: Mira takes the next step.",
+  "temperature": 1.0,
+  "attempt_count": 2,
+  "attempts": [
+    {
+      "attempt": 1,
+      "outcome": "APIConnectionError",
+      "raised": "APIConnectionError",
+      "message": "simulated APIConnectionError on attempt 1"
+    },
+    {
+      "attempt": 2,
+      "outcome": "success",
+      "result": "success"
+    }
+  ]
+}
+
+Assertions
+  - PASS | exit_code actual=0 expected=0
+  - PASS | stdout actual='Drafted chapter 1 at E:\\github\\novel-worktrees\\roadmap-next-step\\changes\\route-a-real-trigger-verification\\runtime\\retry-recovery\\mybook\\chapters\\chapter_1.md\n' expected='Drafted chapter 1 at E:\\github\\novel-worktrees\\roadmap-next-step\\changes\\route-a-real-trigger-verification\\runtime\\retry-recovery\\mybook\\chapters\\chapter_1.md\n'
+  - PASS | stderr actual='' expected=''
+  - PASS | chapter_exists path=E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-recovery\mybook\chapters\chapter_1.md
+  - PASS | chapter_text actual='Provider-backed recovery draft body.\n'
+  - PASS | state_chapters actual=[{'number': 1, 'title': 'Chapter 1', 'status': 'draft', 'summary': 'Mira takes the next step.', 'settled_at': ''}]
+  - PASS | attempt_count actual=2 expected=2
+  - PASS | provider_prompt actual='Draft Chapter 1 about Mira. Summary: Mira takes the next step.'
+  - PASS | provider_temperature actual=1.0 expected=1.0
+  - PASS | provider_attempts actual=[{'attempt': 1, 'outcome': 'APIConnectionError', 'raised': 'APIConnectionError', 'message': 'simulated APIConnectionError on attempt 1'}, {'attempt': 2, 'outcome': 'success', 'result': 'success'}]
+
+Overall: PASS

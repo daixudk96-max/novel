@@ -1831,6 +1831,173 @@ def test_draft_uses_route_a_provider_when_env_is_configured(monkeypatch) -> None
         )
 
 
+def test_draft_retries_retryable_provider_failure_before_success(monkeypatch) -> None:
+    from novel_cli.commands import chapter as chapter_commands
+
+    runner = CliRunner()
+    RateLimitError = type("RateLimitError", (Exception,), {"status_code": 429})
+
+    class FakeProvider:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def draft(self, *, prompt: str, temperature: float) -> str:
+            self.calls += 1
+            assert prompt == (
+                "Draft Chapter 2 about Mira. Summary: Mira takes the next step."
+            )
+            assert temperature == 1.0
+            if self.calls == 1:
+                raise RateLimitError("retry later")
+            return "Recovered provider-backed draft body."
+
+    with runner.isolated_filesystem():
+        provider = FakeProvider()
+        _save_state_with_active_entity()
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+        monkeypatch.setattr(
+            chapter_commands, "build_route_a_provider", lambda: provider
+        )
+
+        result = runner.invoke(
+            cli, ["chapter", "draft", "--chapter", "2"], catch_exceptions=False
+        )
+
+        assert result.exit_code == 0
+        assert provider.calls == 2
+        assert (Path("chapters") / "chapter_2.md").read_text(encoding="utf-8") == (
+            "Recovered provider-backed draft body."
+        )
+        assert CanonicalState.load(Path.cwd()).data["chapters"] == [
+            {
+                "number": 2,
+                "title": "Chapter 2",
+                "status": "draft",
+                "summary": "Mira takes the next step.",
+                "settled_at": "",
+            }
+        ]
+
+
+def test_draft_json_error_reports_retryable_provider_exhaustion(monkeypatch) -> None:
+    from novel_cli.commands import chapter as chapter_commands
+
+    runner = CliRunner()
+    RateLimitError = type("RateLimitError", (Exception,), {"status_code": 429})
+
+    class FakeProvider:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def draft(self, *, prompt: str, temperature: float) -> str:
+            self.calls += 1
+            assert prompt == (
+                "Draft Chapter 1 about Mira. Summary: Mira takes the next step."
+            )
+            assert temperature == 1.0
+            raise RateLimitError("retry later")
+
+    with runner.isolated_filesystem():
+        provider = FakeProvider()
+        _save_state_with_active_entity()
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+        monkeypatch.setattr(
+            chapter_commands, "build_route_a_provider", lambda: provider
+        )
+
+        result = runner.invoke(
+            cli,
+            ["--json", "chapter", "draft", "--chapter", "1"],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert provider.calls == 3
+        assert json.loads(result.output) == {
+            "error": "chapter draft failed after 3 attempts: retry later",
+            "code": 1,
+        }
+        assert not (Path("chapters") / "chapter_1.md").exists()
+        assert CanonicalState.load(Path.cwd()).data["chapters"] == []
+
+
+def test_draft_provider_auth_error_fails_fast_without_retry(monkeypatch) -> None:
+    from novel_cli.commands import chapter as chapter_commands
+
+    runner = CliRunner()
+    AuthenticationError = type(
+        "AuthenticationError", (Exception,), {"status_code": 401}
+    )
+
+    class FakeProvider:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def draft(self, *, prompt: str, temperature: float) -> str:
+            self.calls += 1
+            raise AuthenticationError("bad key")
+
+    with runner.isolated_filesystem():
+        provider = FakeProvider()
+        _save_state_with_active_entity()
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+        monkeypatch.setattr(
+            chapter_commands, "build_route_a_provider", lambda: provider
+        )
+
+        result = runner.invoke(
+            cli, ["chapter", "draft", "--chapter", "1"], catch_exceptions=False
+        )
+
+        assert result.exit_code == 1
+        assert provider.calls == 1
+        assert result.output == "Error: chapter 1 draft provider failed: bad key\n"
+        assert not (Path("chapters") / "chapter_1.md").exists()
+        assert CanonicalState.load(Path.cwd()).data["chapters"] == []
+
+
+def test_draft_provider_invalid_request_fails_fast_without_retry(monkeypatch) -> None:
+    from novel_cli.commands import chapter as chapter_commands
+
+    runner = CliRunner()
+
+    class FakeProvider:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def draft(self, *, prompt: str, temperature: float) -> str:
+            self.calls += 1
+            raise ValueError("invalid prompt")
+
+    with runner.isolated_filesystem():
+        provider = FakeProvider()
+        _save_state_with_active_entity()
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+        monkeypatch.setattr(
+            chapter_commands, "build_route_a_provider", lambda: provider
+        )
+
+        result = runner.invoke(
+            cli,
+            ["--json", "chapter", "draft", "--chapter", "1"],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert provider.calls == 1
+        assert json.loads(result.output) == {"error": "invalid prompt", "code": 1}
+        assert not (Path("chapters") / "chapter_1.md").exists()
+        assert CanonicalState.load(Path.cwd()).data["chapters"] == []
+
+
 def test_draft_requires_active_world_entity_plain_output() -> None:
     runner = CliRunner()
 

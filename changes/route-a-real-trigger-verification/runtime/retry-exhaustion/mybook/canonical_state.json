@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "project": {
+    "name": "mybook",
+    "genre": "fantasy",
+    "created_at": "2026-03-27T10:00:30Z"
+  },
+  "world": {
+    "entities": [
+      {
+        "id": "entity-1",
+        "name": "Mira",
+        "type": "character",
+        "attributes": {
+          "role": "lead"
+        },
+        "visibility": "active"
+      }
+    ],
+    "relationships": []
+  },
+  "timeline": {
+    "current_chapter": 0,
+    "events": []
+  },
+  "foreshadows": [],
+  "chapters": []
+}

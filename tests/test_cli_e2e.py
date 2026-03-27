@@ -543,6 +543,120 @@ def test_chapter_full_lifecycle_json_mode(monkeypatch) -> None:
         assert snapshot_state["timeline"] == state["timeline"]
 
 
+# verification selector: def test_chapter_draft_retry_recovery_preserves_single_write|def test_chapter_draft_retry_exhaustion_leaves_no_partial_side_effects
+def test_chapter_draft_retry_recovery_preserves_single_write(monkeypatch) -> None:
+    from novel_cli.commands import chapter as chapter_commands
+
+    runner = CliRunner()
+    original_upsert = chapter_commands._upsert_chapter
+    original_save = CanonicalState.save
+    original_write_text = Path.write_text
+
+    with runner.isolated_filesystem():
+        _save_route_a_project()
+        counts = {"upsert": 0, "save": 0, "chapter_write": 0}
+        provider = _RetryThenSuccessDraftProvider()
+
+        def tracked_upsert(state, draft):
+            counts["upsert"] += 1
+            return original_upsert(state, draft)
+
+        def tracked_save(self, project_dir: Path):
+            counts["save"] += 1
+            return original_save(self, project_dir)
+
+        def tracked_write_text(path: Path, data: str, *args, **kwargs):
+            if path.name == "chapter_1.md":
+                counts["chapter_write"] += 1
+            return original_write_text(path, data, *args, **kwargs)
+
+        monkeypatch.setattr(
+            chapter_commands, "build_route_a_provider", lambda: provider
+        )
+        monkeypatch.setattr(chapter_commands, "_upsert_chapter", tracked_upsert)
+        monkeypatch.setattr(CanonicalState, "save", tracked_save)
+        monkeypatch.setattr(Path, "write_text", tracked_write_text)
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+
+        result = runner.invoke(
+            cli, ["chapter", "draft", "--chapter", "1"], catch_exceptions=False
+        )
+
+        project_dir = Path.cwd()
+        chapter_path = project_dir / "chapters" / "chapter_1.md"
+        assert result.exit_code == 0
+        assert provider.calls == 2
+        assert counts == {"upsert": 1, "save": 1, "chapter_write": 1}
+        assert chapter_path.read_text(encoding="utf-8") == "Recovered after retry."
+        assert CanonicalState.load(project_dir).data["chapters"] == [
+            {
+                "number": 1,
+                "title": "Chapter 1",
+                "status": "draft",
+                "summary": "Mira takes the next step.",
+                "settled_at": "",
+            }
+        ]
+
+
+def test_chapter_draft_retry_exhaustion_leaves_no_partial_side_effects(
+    monkeypatch,
+) -> None:
+    from novel_cli.commands import chapter as chapter_commands
+
+    runner = CliRunner()
+    original_upsert = chapter_commands._upsert_chapter
+    original_save = CanonicalState.save
+    original_write_text = Path.write_text
+
+    with runner.isolated_filesystem():
+        _save_route_a_project()
+        counts = {"upsert": 0, "save": 0, "chapter_write": 0}
+        provider = _AlwaysRetryableDraftProvider()
+
+        def tracked_upsert(state, draft):
+            counts["upsert"] += 1
+            return original_upsert(state, draft)
+
+        def tracked_save(self, project_dir: Path):
+            counts["save"] += 1
+            return original_save(self, project_dir)
+
+        def tracked_write_text(path: Path, data: str, *args, **kwargs):
+            if path.name == "chapter_1.md":
+                counts["chapter_write"] += 1
+            return original_write_text(path, data, *args, **kwargs)
+
+        monkeypatch.setattr(
+            chapter_commands, "build_route_a_provider", lambda: provider
+        )
+        monkeypatch.setattr(chapter_commands, "_upsert_chapter", tracked_upsert)
+        monkeypatch.setattr(CanonicalState, "save", tracked_save)
+        monkeypatch.setattr(Path, "write_text", tracked_write_text)
+        monkeypatch.setenv("NOVEL_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("NOVEL_LLM_MODEL", "gpt-4o-mini")
+        monkeypatch.setenv("NOVEL_LLM_API_KEY", "test-key")
+
+        result = runner.invoke(
+            cli,
+            ["--json", "chapter", "draft", "--chapter", "1"],
+            catch_exceptions=False,
+        )
+
+        project_dir = Path.cwd()
+        assert result.exit_code == 1
+        assert provider.calls == 3
+        assert json.loads(result.output) == {
+            "error": "chapter draft failed after 3 attempts: retry later",
+            "code": 1,
+        }
+        assert counts == {"upsert": 0, "save": 0, "chapter_write": 0}
+        assert not (project_dir / "chapters" / "chapter_1.md").exists()
+        assert CanonicalState.load(project_dir).data["chapters"] == []
+
+
 def test_route_b_guided_flow_without_llm_env(monkeypatch) -> None:
     from novel_cli.commands import chapter as chapter_commands
 
@@ -870,6 +984,20 @@ def _clear_llm_env(monkeypatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
+def _save_route_a_project() -> None:
+    state = CanonicalState.create_empty("mybook", "fantasy")
+    state.data["world"]["entities"].append(
+        {
+            "id": "entity-1",
+            "name": "Mira",
+            "type": "character",
+            "attributes": {"role": "lead"},
+            "visibility": "active",
+        }
+    )
+    state.save(Path.cwd())
+
+
 def _write_guided_result_artifacts(
     *, chapter_number: int, ready_for_cli_validation: bool = True
 ) -> tuple[Path, Path, Path]:
@@ -970,3 +1098,35 @@ class _E2EFakeDraftProvider:
         header, summary = prompt.split(summary_marker, maxsplit=1)
         chapter_number, _, _ = header.removeprefix(prefix).partition(" about ")
         return f"# Chapter {chapter_number}\n\n{summary}\n"
+
+
+class _RetryThenSuccessDraftProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def draft(self, *, prompt: str, temperature: float) -> str:
+        self.calls += 1
+        assert (
+            prompt == "Draft Chapter 1 about Mira. Summary: Mira takes the next step."
+        )
+        assert temperature == 1.0
+        if self.calls == 1:
+            raise _RateLimitError("retry later")
+        return "Recovered after retry."
+
+
+class _AlwaysRetryableDraftProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def draft(self, *, prompt: str, temperature: float) -> str:
+        self.calls += 1
+        assert (
+            prompt == "Draft Chapter 1 about Mira. Summary: Mira takes the next step."
+        )
+        assert temperature == 1.0
+        raise _RateLimitError("retry later")
+
+
+class _RateLimitError(Exception):
+    status_code = 429

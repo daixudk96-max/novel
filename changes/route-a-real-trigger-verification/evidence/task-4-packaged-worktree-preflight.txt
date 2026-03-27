@@ -1,0 +1,92 @@
+Task 4 packaged worktree preflight
+
+Workspace: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\worktree-preflight
+Packaged entrypoint: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe
+
+Environment
+  PYTHONPATH=E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\support;E:\github\novel-worktrees\roadmap-next-step\novel-cli;E:\github\novel-worktrees\roadmap-next-step\novel-runtime
+  NOVEL_REAL_VERIFY_FAKE_PROVIDER=<unset>
+  NOVEL_LLM_PROVIDER=<unset>
+  NOVEL_LLM_MODEL=<unset>
+  NOVEL_LLM_API_KEY=<unset>
+
+Commands
+  1. cwd: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\worktree-preflight
+     argv: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe --help
+     exit_code: 0
+     elapsed_seconds: 1.459
+     stdout: 'Usage: novel [OPTIONS] COMMAND [ARGS]...\n\nOptions:\n  --version  Show the version and exit.\n  --json     Emit JSON output.\n  --help     Show this message and exit.\n\nCommands:\n  chapter\n  project\n  repl\n  snapshot\n  state\n  world\n'
+     stderr: ''
+  2. cwd: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\worktree-preflight
+     argv: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe project init mybook --genre fantasy
+     exit_code: 0
+     elapsed_seconds: 1.084
+     stdout: "Initialized project 'mybook' at E:\\github\\novel-worktrees\\roadmap-next-step\\changes\\route-a-real-trigger-verification\\runtime\\worktree-preflight\\mybook\n"
+     stderr: ''
+  3. cwd: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\worktree-preflight
+     argv: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe world entity add --name Mira --type character --attributes {"role": "lead"}
+     exit_code: 0
+     elapsed_seconds: 1.256
+     stdout: "Added entity 'Mira' (entity-1)\n"
+     stderr: ''
+  4. cwd: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\worktree-preflight
+     argv: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe chapter draft --chapter 1
+     exit_code: 1
+     elapsed_seconds: 1.334
+     stdout: ''
+     stderr: 'Error: NOVEL_LLM_PROVIDER is required for Route A provider resolution\n'
+  5. cwd: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\worktree-preflight
+     argv: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe --json chapter draft --chapter 1
+     exit_code: 1
+     elapsed_seconds: 1.147
+     stdout: '{"code": 1, "error": "NOVEL_LLM_PROVIDER is required for Route A provider resolution"}\n'
+     stderr: ''
+
+Files
+  canonical_state_path: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\worktree-preflight\mybook\canonical_state.json
+  canonical_state_json: {
+  "version": 1,
+  "project": {
+    "name": "mybook",
+    "genre": "fantasy",
+    "created_at": "2026-03-27T10:50:21Z"
+  },
+  "world": {
+    "entities": [
+      {
+        "id": "entity-1",
+        "name": "Mira",
+        "type": "character",
+        "attributes": {
+          "role": "lead"
+        },
+        "visibility": "active"
+      }
+    ],
+    "relationships": []
+  },
+  "timeline": {
+    "current_chapter": 0,
+    "events": []
+  },
+  "foreshadows": [],
+  "chapters": []
+}
+  chapter_path: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\worktree-preflight\mybook\chapters\chapter_1.md
+  chapter_exists: False
+
+Assertions
+  - PASS | help_exit_code actual=0 expected=0
+  - PASS | help_contains_chapter actual=True expected=True
+  - PASS | init_exit_code actual=0 expected=0
+  - PASS | entity_exit_code actual=0 expected=0
+  - PASS | plain_exit_code actual=1 expected=1
+  - PASS | plain_stdout actual='' expected=''
+  - PASS | plain_stderr actual='Error: NOVEL_LLM_PROVIDER is required for Route A provider resolution\n'
+  - PASS | json_exit_code actual=1 expected=1
+  - PASS | json_payload actual={'code': 1, 'error': 'NOVEL_LLM_PROVIDER is required for Route A provider resolution'}
+  - PASS | json_stderr actual='' expected=''
+  - PASS | chapter_absent path=E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\worktree-preflight\mybook\chapters\chapter_1.md
+  - PASS | state_chapters actual=[] expected=[]
+
+Overall: PASS

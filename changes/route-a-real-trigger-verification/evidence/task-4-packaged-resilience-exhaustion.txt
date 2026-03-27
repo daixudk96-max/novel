@@ -1,0 +1,141 @@
+Task 4 packaged resilience exhaustion
+
+Workspace: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-exhaustion
+Packaged entrypoint: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe
+
+Environment
+  PYTHONPATH=E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\support;E:\github\novel-worktrees\roadmap-next-step\novel-cli;E:\github\novel-worktrees\roadmap-next-step\novel-runtime
+  NOVEL_LLM_PROVIDER=openai
+  NOVEL_LLM_MODEL=gpt-4o-mini
+  NOVEL_LLM_API_KEY=test-key
+  NOVEL_REAL_VERIFY_FAKE_PROVIDER=1
+  NOVEL_REAL_VERIFY_DRAFT_TEXT_FILE=E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-exhaustion\fake-draft-exhaustion.txt
+  NOVEL_REAL_VERIFY_PROVIDER_CALL_LOG=E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-exhaustion\provider-call-exhaustion-plain.json
+  NOVEL_REAL_VERIFY_RETRY_SEQUENCE=APIConnectionError,RateLimitError,InternalServerError
+
+Commands
+  1. cwd: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-exhaustion
+     argv: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe project init mybook --genre fantasy
+     exit_code: 0
+     elapsed_seconds: 7.461
+     stdout: "Initialized project 'mybook' at E:\\github\\novel-worktrees\\roadmap-next-step\\changes\\route-a-real-trigger-verification\\runtime\\retry-exhaustion\\mybook\n"
+     stderr: ''
+  2. cwd: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-exhaustion
+     argv: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe world entity add --name Mira --type character --attributes {"role": "lead"}
+     exit_code: 0
+     elapsed_seconds: 2.412
+     stdout: "Added entity 'Mira' (entity-1)\n"
+     stderr: ''
+  3. cwd: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-exhaustion
+     argv: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe chapter draft --chapter 1
+     exit_code: 1
+     elapsed_seconds: 2.899
+     stdout: ''
+     stderr: 'Error: chapter draft failed after 3 attempts: simulated InternalServerError on attempt 3\n'
+  4. cwd: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-exhaustion
+     argv: C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe --json chapter draft --chapter 1
+     exit_code: 1
+     elapsed_seconds: 2.673
+     stdout: '{"code": 1, "error": "chapter draft failed after 3 attempts: simulated InternalServerError on attempt 3"}\n'
+     stderr: ''
+
+Files
+  chapter_path: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-exhaustion\mybook\chapters\chapter_1.md
+  chapter_exists: False
+  canonical_state_path: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-exhaustion\mybook\canonical_state.json
+  canonical_state_json: {
+  "version": 1,
+  "project": {
+    "name": "mybook",
+    "genre": "fantasy",
+    "created_at": "2026-03-27T10:00:30Z"
+  },
+  "world": {
+    "entities": [
+      {
+        "id": "entity-1",
+        "name": "Mira",
+        "type": "character",
+        "attributes": {
+          "role": "lead"
+        },
+        "visibility": "active"
+      }
+    ],
+    "relationships": []
+  },
+  "timeline": {
+    "current_chapter": 0,
+    "events": []
+  },
+  "foreshadows": [],
+  "chapters": []
+}
+  plain_provider_call_log_path: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-exhaustion\provider-call-exhaustion-plain.json
+  plain_provider_call_log_json: {
+  "prompt": "Draft Chapter 1 about Mira. Summary: Mira takes the next step.",
+  "temperature": 1.0,
+  "attempt_count": 3,
+  "attempts": [
+    {
+      "attempt": 1,
+      "outcome": "APIConnectionError",
+      "raised": "APIConnectionError",
+      "message": "simulated APIConnectionError on attempt 1"
+    },
+    {
+      "attempt": 2,
+      "outcome": "RateLimitError",
+      "raised": "RateLimitError",
+      "message": "simulated RateLimitError on attempt 2"
+    },
+    {
+      "attempt": 3,
+      "outcome": "InternalServerError",
+      "raised": "InternalServerError",
+      "message": "simulated InternalServerError on attempt 3"
+    }
+  ]
+}
+  json_provider_call_log_path: E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-exhaustion\provider-call-exhaustion-json.json
+  json_provider_call_log_json: {
+  "prompt": "Draft Chapter 1 about Mira. Summary: Mira takes the next step.",
+  "temperature": 1.0,
+  "attempt_count": 3,
+  "attempts": [
+    {
+      "attempt": 1,
+      "outcome": "APIConnectionError",
+      "raised": "APIConnectionError",
+      "message": "simulated APIConnectionError on attempt 1"
+    },
+    {
+      "attempt": 2,
+      "outcome": "RateLimitError",
+      "raised": "RateLimitError",
+      "message": "simulated RateLimitError on attempt 2"
+    },
+    {
+      "attempt": 3,
+      "outcome": "InternalServerError",
+      "raised": "InternalServerError",
+      "message": "simulated InternalServerError on attempt 3"
+    }
+  ]
+}
+
+Assertions
+  - PASS | plain_exit_code actual=1 expected=1
+  - PASS | plain_stdout actual='' expected=''
+  - PASS | plain_stderr actual='Error: chapter draft failed after 3 attempts: simulated InternalServerError on attempt 3\n'
+  - PASS | json_exit_code actual=1 expected=1
+  - PASS | json_payload actual={'code': 1, 'error': 'chapter draft failed after 3 attempts: simulated InternalServerError on attempt 3'}
+  - PASS | json_stderr actual='' expected=''
+  - PASS | chapter_absent path=E:\github\novel-worktrees\roadmap-next-step\changes\route-a-real-trigger-verification\runtime\retry-exhaustion\mybook\chapters\chapter_1.md
+  - PASS | state_chapters actual=[] expected=[]
+  - PASS | plain_attempt_count actual=3 expected=3
+  - PASS | json_attempt_count actual=3 expected=3
+  - PASS | plain_provider_attempts actual=[{'attempt': 1, 'outcome': 'APIConnectionError', 'raised': 'APIConnectionError', 'message': 'simulated APIConnectionError on attempt 1'}, {'attempt': 2, 'outcome': 'RateLimitError', 'raised': 'RateLimitError', 'message': 'simulated RateLimitError on attempt 2'}, {'attempt': 3, 'outcome': 'InternalServerError', 'raised': 'InternalServerError', 'message': 'simulated InternalServerError on attempt 3'}]
+  - PASS | json_provider_attempts actual=[{'attempt': 1, 'outcome': 'APIConnectionError', 'raised': 'APIConnectionError', 'message': 'simulated APIConnectionError on attempt 1'}, {'attempt': 2, 'outcome': 'RateLimitError', 'raised': 'RateLimitError', 'message': 'simulated RateLimitError on attempt 2'}, {'attempt': 3, 'outcome': 'InternalServerError', 'raised': 'InternalServerError', 'message': 'simulated InternalServerError on attempt 3'}]
+
+Overall: PASS

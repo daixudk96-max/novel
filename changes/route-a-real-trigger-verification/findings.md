@@ -98,3 +98,23 @@
 - **Evidence**:
   - `changes/route-a-real-trigger-verification/evidence/task-9-verification-ledger.txt`
   - `changes/route-a-real-trigger-verification/evidence/task-9-verification-ledger-error.txt`
+
+## Task 4 extension: Packaged Route A resilience recovery and exhaustion
+- **Result**: PASS
+- **Implementation**: `changes/route-a-real-trigger-verification/support/sitecustomize.py` now accepts `NOVEL_REAL_VERIFY_RETRY_SEQUENCE` so the existing offline harness can deterministically raise retryable `APIConnectionError`, `APITimeoutError`, `InternalServerError`, or `RateLimitError` outcomes before eventual success.
+- **Implementation**: `changes/route-a-real-trigger-verification/support/task_4_packaged_resilience.py` seeds fresh `runtime/retry-recovery/` and `runtime/retry-exhaustion/` lanes through the packaged Python 3.12 Scripts `novel.exe` path, injects the worktree `novel-cli` / `novel-runtime` code through `PYTHONPATH`, and writes task-specific evidence under the existing evidence tree.
+- **Observable**: Recovery proof used packaged `C:\Users\daixu\AppData\Local\Programs\Python\Python312\Scripts\novel.exe chapter draft --chapter 1` with `NOVEL_REAL_VERIFY_RETRY_SEQUENCE=APIConnectionError,success`; the call log recorded exactly two attempts, then `runtime/retry-recovery/mybook/chapters/chapter_1.md` and `canonical_state.json` showed exactly one coherent chapter artifact/state write.
+- **Observable**: Exhaustion proof used packaged plain and JSON `chapter draft --chapter 1` runs with `NOVEL_REAL_VERIFY_RETRY_SEQUENCE=APIConnectionError,RateLimitError,InternalServerError`; both runs exhausted the frozen 3-attempt budget and emitted the stable `chapter draft failed after 3 attempts:` contract.
+- **Guardrail**: `runtime/retry-exhaustion/mybook/canonical_state.json` kept `chapters: []`, `runtime/retry-exhaustion/mybook/chapters/chapter_1.md` never appeared, and both exhaustion call logs recorded the same three retryable attempts, proving zero partial writes.
+- **Evidence**:
+  - `changes/route-a-real-trigger-verification/evidence/task-4-packaged-resilience-recovery.txt`
+  - `changes/route-a-real-trigger-verification/evidence/task-4-packaged-resilience-exhaustion.txt`
+
+## Final-wave repair: worktree-only packaged proof and clutter cleanup
+- **Result**: PASS
+- **Implementation**: Added `changes/route-a-real-trigger-verification/support/task_4_worktree_packaged_preflight.py` to prove the explicit Python 3.12 Scripts `novel.exe` entrypoint runs against the active worktree code path via `PYTHONPATH=<worktree support>;<worktree novel-cli>;<worktree novel-runtime>`.
+- **Observable**: `changes/route-a-real-trigger-verification/evidence/task-4-packaged-worktree-preflight.txt` captures packaged `novel.exe --help`, then packaged plain/JSON `chapter draft --chapter 1` fail-fast provider-env errors from a seeded worktree-only workspace with `NOVEL_LLM_PROVIDER`, `NOVEL_LLM_MODEL`, and `NOVEL_LLM_API_KEY` unset.
+- **Guardrail**: The worktree preflight lane kept `mybook/canonical_state.json` with `chapters: []` and never created `mybook/chapters/chapter_1.md`, proving the fail-fast env path stayed offline and side-effect free beyond seeded project/entity setup.
+- **Cleanup**: Removed out-of-scope worktree clutter at the repo root (`.novel_project_path`, `assistant-result.json`, `canonical_state.json`, `canonical_state.json.lock`, `artifacts/`), deleted `.claude/tdd-guard/data/test.json`, and removed `__pycache__/` directories under `tests/`, `novel-cli/`, `novel-runtime/`, and `changes/route-a-real-trigger-verification/support/`.
+- **Evidence**:
+  - `changes/route-a-real-trigger-verification/evidence/task-4-packaged-worktree-preflight.txt`
