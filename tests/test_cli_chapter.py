@@ -3,6 +3,7 @@ from pathlib import Path
 
 import click
 from click.testing import CliRunner
+
 from novel_runtime.state.canonical import CanonicalState
 
 from novel_cli.main import cli
@@ -15,12 +16,483 @@ def test_chapter_help_locks_current_executable_surface() -> None:
 
     assert result.exit_code == 0
     assert "draft" in result.output
+    assert "verify-guided-result" in result.output
     assert "settle" in result.output
     assert "postcheck" in result.output
     assert "audit" in result.output
     assert "route" in result.output
     assert "revise" in result.output
     assert "approve" in result.output
+
+
+def test_verify_guided_result_accepts_valid_manifest() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_chapter(1)
+        manifest_path = _write_assistant_result_manifest(chapter_number=1)
+
+        result = runner.invoke(
+            cli,
+            [
+                "chapter",
+                "verify-guided-result",
+                "--chapter",
+                "1",
+                "--manifest-file",
+                str(manifest_path),
+                "--json",
+            ],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 0
+        assert json.loads(result.output) == {
+            "ok": True,
+            "command": "chapter verify-guided-result",
+            "version": "novel-cli-agent/v1",
+            "data": {
+                "guidance_id": "guide-chapter-1-route-b-v1",
+                "chapter": 1,
+                "prose_path": str(
+                    (Path.cwd() / "artifacts" / "chapter-1" / "chapter-1.md").resolve()
+                ),
+                "settlement_path": str(
+                    (
+                        Path.cwd()
+                        / "artifacts"
+                        / "chapter-1"
+                        / "chapter-1.settlement.json"
+                    ).resolve()
+                ),
+                "command_receipts": [],
+                "warnings": [],
+                "ready_for_cli_validation": True,
+            },
+            "warnings": [],
+            "recommended_action": "chapter settle",
+        }
+
+
+def test_verify_guided_result_is_non_mutating() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_chapter(1)
+        manifest_path = _write_assistant_result_manifest(chapter_number=1)
+        before_state = json.loads(
+            json.dumps(CanonicalState.load(Path.cwd()).data, sort_keys=True)
+        )
+        before_files = _project_files()
+
+        result = runner.invoke(
+            cli,
+            [
+                "chapter",
+                "verify-guided-result",
+                "--chapter",
+                "1",
+                "--manifest-file",
+                str(manifest_path),
+            ],
+            catch_exceptions=False,
+        )
+
+        after_state = json.loads(
+            json.dumps(CanonicalState.load(Path.cwd()).data, sort_keys=True)
+        )
+
+        assert result.exit_code == 0
+        assert result.output == (
+            "Chapter: 1\n"
+            "Guidance ID: guide-chapter-1-route-b-v1\n"
+            "Ready for CLI validation: yes\n"
+            "Recommended action: chapter settle\n"
+        )
+        assert after_state == before_state
+        assert _project_files() == before_files
+
+
+def test_verify_guided_result_rejects_wrong_version() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_chapter(1)
+        manifest_path = _write_assistant_result_manifest(
+            chapter_number=1,
+            version="assistant-result/v2",
+        )
+
+        result = runner.invoke(
+            cli,
+            [
+                "chapter",
+                "verify-guided-result",
+                "--chapter",
+                "1",
+                "--manifest-file",
+                str(manifest_path),
+            ],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert (
+            result.output
+            == "Error: manifest version 'assistant-result/v2' must be 'assistant-result/v1'\n"
+        )
+
+
+def test_verify_guided_result_rejects_wrong_chapter() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_chapter(1)
+        manifest_path = _write_assistant_result_manifest(
+            chapter_number=2,
+            guidance_id="guide-chapter-1-route-b-v1",
+        )
+
+        result = runner.invoke(
+            cli,
+            [
+                "chapter",
+                "verify-guided-result",
+                "--chapter",
+                "1",
+                "--manifest-file",
+                str(manifest_path),
+            ],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert (
+            result.output
+            == "Error: manifest chapter '2' does not match --chapter '1'\n"
+        )
+
+
+def test_verify_guided_result_rejects_missing_receipts_when_cli_used() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_chapter(1)
+        manifest_path = _write_assistant_result_manifest(
+            chapter_number=1,
+            operations_performed=[
+                "read_project_files",
+                "invoke_published_cli_command",
+                "capture_command_receipt",
+                "bundle_named_outputs",
+            ],
+            command_receipts=[],
+        )
+
+        result = runner.invoke(
+            cli,
+            [
+                "chapter",
+                "verify-guided-result",
+                "--chapter",
+                "1",
+                "--manifest-file",
+                str(manifest_path),
+            ],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert (
+            result.output
+            == "Error: manifest command_receipts must be non-empty when invoke_published_cli_command was performed\n"
+        )
+
+
+def test_verify_guided_result_rejects_canonical_state_path() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_chapter(1)
+        prose_alias = (
+            Path("artifacts") / "chapter-1" / ".." / ".." / "canonical_state.json"
+        )
+        settlement_path = _write_assistant_result_settlement(
+            chapter_number=1,
+            prose_path="artifacts/chapter-1/chapter-1.md",
+        )
+        manifest_path = _write_assistant_result_manifest(
+            chapter_number=1,
+            prose_path=prose_alias,
+            settlement_path=settlement_path,
+        )
+
+        result = runner.invoke(
+            cli,
+            [
+                "chapter",
+                "verify-guided-result",
+                "--chapter",
+                "1",
+                "--manifest-file",
+                str(manifest_path),
+            ],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert (
+            result.output
+            == "Error: manifest prose_path resolves to forbidden path 'canonical_state.json'\n"
+        )
+
+
+def test_verify_guided_result_rejects_project_marker_path() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_chapter(1)
+        prose_path = _write_assistant_result_prose(chapter_number=1)
+        marker_path = Path(".novel_project_path")
+        marker_path.write_text(str(Path.cwd()), encoding="utf-8")
+        settlement_alias = (
+            Path("artifacts") / "chapter-1" / ".." / ".." / ".novel_project_path"
+        )
+        manifest_path = _write_assistant_result_manifest(
+            chapter_number=1,
+            prose_path=prose_path,
+            settlement_path=settlement_alias,
+        )
+
+        result = runner.invoke(
+            cli,
+            [
+                "chapter",
+                "verify-guided-result",
+                "--chapter",
+                "1",
+                "--manifest-file",
+                str(manifest_path),
+            ],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert (
+            result.output
+            == "Error: manifest settlement_path resolves to forbidden path '.novel_project_path'\n"
+        )
+
+
+def test_chapter_guide_help_surface_lists_export_command() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(cli, ["chapter", "--help"], catch_exceptions=False)
+
+    assert result.exit_code == 0
+    assert "guide" in result.output
+
+
+def test_chapter_guide_requires_selected_project() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        result = runner.invoke(
+            cli,
+            ["--json", "chapter", "guide", "--chapter", "1"],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert json.loads(result.output) == {
+            "error": "no novel project selected",
+            "code": 1,
+        }
+
+
+def test_chapter_guide_requires_active_entity() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        CanonicalState.create_empty("mybook", "fantasy").save(Path.cwd())
+
+        result = runner.invoke(
+            cli,
+            ["--json", "chapter", "guide", "--chapter", "1"],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1
+        assert json.loads(result.output) == {
+            "error": "chapter 1 guide requires at least one active world entity",
+            "code": 1,
+        }
+
+
+def test_chapter_guide_plain_text_output() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_active_entity()
+
+        result = runner.invoke(
+            cli,
+            ["chapter", "guide", "--chapter", "3"],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 0
+        assert result.output == (
+            "Chapter: 3\n"
+            "Route: Route B phase 1\n"
+            "Guidance ID: guide-chapter-3-route-b-v1\n"
+            "Recommended action: chapter verify-guided-result\n"
+        )
+
+
+def test_chapter_guide_is_non_mutating(monkeypatch) -> None:
+    from novel_cli.commands import chapter as chapter_commands
+
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_active_entity()
+        before_state = json.loads(
+            json.dumps(CanonicalState.load(Path.cwd()).data, sort_keys=True)
+        )
+        before_files = _project_files()
+
+        def unexpected_provider(*args, **kwargs):
+            raise AssertionError("guide must stay provider-free")
+
+        def unexpected_save(self, project_dir: Path) -> None:
+            raise AssertionError("guide must not save canonical state")
+
+        monkeypatch.setattr(
+            chapter_commands, "build_route_a_provider", unexpected_provider
+        )
+        monkeypatch.setattr(CanonicalState, "save", unexpected_save)
+
+        result = runner.invoke(
+            cli,
+            ["chapter", "guide", "--chapter", "2", "--json"],
+            catch_exceptions=False,
+        )
+
+        after_state = json.loads(
+            json.dumps(CanonicalState.load(Path.cwd()).data, sort_keys=True)
+        )
+        after_files = _project_files()
+
+        assert result.exit_code == 0
+        assert json.loads(result.output) == {
+            "ok": True,
+            "command": "chapter guide",
+            "version": "novel-cli-agent/v1",
+            "warnings": [],
+            "recommended_action": "chapter verify-guided-result",
+            "data": {
+                "guidance_id": "guide-chapter-2-route-b-v1",
+                "version": "route-b-guidance/v1",
+                "workflow_id": "chapter-guided-assistant-v1",
+                "chapter": 2,
+                "route": "Route B phase 1",
+                "allowed_operations": [
+                    "read_project_files",
+                    "write_text_artifact",
+                    "write_json_artifact",
+                    "invoke_published_cli_command",
+                    "capture_command_receipt",
+                    "bundle_named_outputs",
+                ],
+                "required_inputs": [
+                    {
+                        "key": "chapter_number",
+                        "source_of_truth": "chapter guide --chapter N",
+                        "access": "guidance_metadata",
+                    },
+                    {
+                        "key": "selected_project",
+                        "source_of_truth": "published CLI project context",
+                        "access": "guidance_metadata",
+                    },
+                ],
+                "required_artifacts": [
+                    {
+                        "key": "prose_artifact",
+                        "kind": "text",
+                        "required": True,
+                        "description": "Chapter prose artifact produced by the assistant",
+                    },
+                    {
+                        "key": "settlement_artifact",
+                        "kind": "json",
+                        "required": True,
+                        "description": "Assistant-filled settlement JSON created from the emitted template",
+                    },
+                    {
+                        "key": "assistant_result_manifest",
+                        "kind": "json",
+                        "required": True,
+                        "description": "assistant-result/v1 manifest returned for CLI validation",
+                    },
+                ],
+                "command_sequence": [
+                    {
+                        "step_id": "read-chapter-context",
+                        "operation": "read_project_files",
+                        "inputs": ["chapter_number", "selected_project"],
+                        "outputs": ["chapter_context"],
+                    },
+                    {
+                        "step_id": "write-prose-artifact",
+                        "operation": "write_text_artifact",
+                        "inputs": ["chapter_context"],
+                        "outputs": ["prose_artifact"],
+                    },
+                    {
+                        "step_id": "write-settlement-artifact",
+                        "operation": "write_json_artifact",
+                        "inputs": ["prose_artifact"],
+                        "outputs": ["settlement_artifact"],
+                    },
+                    {
+                        "step_id": "bundle-return-artifacts",
+                        "operation": "bundle_named_outputs",
+                        "inputs": ["prose_artifact", "settlement_artifact"],
+                        "outputs": ["assistant_result_manifest"],
+                    },
+                ],
+                "validation_gates": [
+                    {
+                        "gate_id": "manifest-matches-upstream-contract",
+                        "description": "Return manifest must satisfy assistant-result/v1 exactly",
+                    },
+                    {
+                        "gate_id": "settlement-file-present",
+                        "description": "Settlement JSON must exist as a separate file-backed artifact",
+                    },
+                    {
+                        "gate_id": "forbidden-paths-not-used",
+                        "description": "No returned path may resolve to canonical_state.json or .novel_project_path",
+                    },
+                ],
+                "settlement_template": {
+                    "chapter": 2,
+                    "prose_path": "artifacts/chapter-2/chapter-2.md",
+                    "summary": "",
+                    "continuity_notes": [],
+                    "open_questions": [],
+                },
+                "expected_return_manifest": {
+                    "manifest_name": "assistant-result-v1",
+                    "required_reference_field": "guidance_id",
+                },
+                "next_cli_step": "chapter verify-guided-result",
+            },
+        }
+        assert after_state == before_state
+        assert after_files == before_files
 
 
 def test_approve_returns_plain_text_for_passing_audit_without_revision() -> None:
@@ -1652,6 +2124,45 @@ def test_settle_updates_state() -> None:
         assert updated_state.data["timeline"]["events"][0]["chapter"] == 1
 
 
+def test_guided_settle_bootstraps_missing_row() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _save_state_with_active_entity()
+        settlement_path = _write_settlement_file(chapter_number=2)
+        chapter_text_path = _write_text_file("chapter_2.md", "Mira reached the vault.")
+
+        result = runner.invoke(
+            cli,
+            [
+                "chapter",
+                "settle",
+                "--chapter",
+                "2",
+                "--settlement-file",
+                str(settlement_path),
+                "--text-file",
+                str(chapter_text_path),
+            ],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 0
+        assert result.output == "Settled chapter 2\n"
+        updated_state = CanonicalState.load(Path.cwd())
+        assert updated_state.data["chapters"] == [
+            {
+                "number": 2,
+                "title": "Chapter 2",
+                "status": "settled",
+                "summary": "",
+                "settled_at": updated_state.data["chapters"][0]["settled_at"],
+            }
+        ]
+        assert updated_state.data["chapters"][0]["settled_at"]
+        assert updated_state.data["world"]["entities"][-1]["name"] == "Sunspire Vault"
+
+
 def test_postcheck_returns_result() -> None:
     runner = CliRunner()
 
@@ -1799,6 +2310,126 @@ def _write_revision_file(payload: dict[str, object]) -> Path:
 def _write_text_file(name: str, content: str) -> Path:
     path = Path(name)
     path.write_text(content, encoding="utf-8")
+    return path
+
+
+def _write_settlement_file(*, chapter_number: int) -> Path:
+    path = Path("settlement.json")
+    path.write_text(
+        json.dumps(
+            {
+                "new_entities": [
+                    {
+                        "id": "entity-2",
+                        "name": "Sunspire Vault",
+                        "type": "location",
+                        "attributes": {"security": "sealed"},
+                        "visibility": "reference",
+                    }
+                ],
+                "updated_entities": [
+                    {
+                        "id": "entity-1",
+                        "attributes": {
+                            "role": "lead",
+                            "location": "Sunspire Vault",
+                        },
+                    }
+                ],
+                "new_relationships": [
+                    {
+                        "source": "entity-1",
+                        "target": "entity-2",
+                        "type": "discovers",
+                        "since_chapter": chapter_number,
+                    }
+                ],
+                "events": [
+                    {
+                        "chapter": chapter_number,
+                        "type": "discovery",
+                        "summary": "Mira discovers the sealed Sunspire Vault.",
+                        "entities": ["entity-1", "entity-2"],
+                    }
+                ],
+                "foreshadow_updates": [],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _write_assistant_result_manifest(
+    *,
+    chapter_number: int,
+    guidance_id: str | None = None,
+    version: str = "assistant-result/v1",
+    operations_performed: list[str] | None = None,
+    command_receipts: list[dict[str, object]] | None = None,
+    prose_path: Path | None = None,
+    settlement_path: Path | None = None,
+) -> Path:
+    prose_path = prose_path or _write_assistant_result_prose(
+        chapter_number=chapter_number
+    )
+    settlement_path = settlement_path or _write_assistant_result_settlement(
+        chapter_number=chapter_number,
+        prose_path=prose_path.as_posix(),
+    )
+    payload = {
+        "guidance_id": guidance_id or f"guide-chapter-{chapter_number}-route-b-v1",
+        "version": version,
+        "chapter": chapter_number,
+        "operations_performed": operations_performed
+        or [
+            "read_project_files",
+            "write_text_artifact",
+            "write_json_artifact",
+            "bundle_named_outputs",
+        ],
+        "created_files": [prose_path.as_posix(), settlement_path.as_posix()],
+        "prose_path": prose_path.as_posix(),
+        "settlement_path": settlement_path.as_posix(),
+        "command_receipts": command_receipts or [],
+        "warnings": [],
+        "ready_for_cli_validation": True,
+    }
+    path = Path("assistant-result.json")
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    return path
+
+
+def _write_assistant_result_prose(*, chapter_number: int) -> Path:
+    path = (
+        Path("artifacts") / f"chapter-{chapter_number}" / f"chapter-{chapter_number}.md"
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("Chapter prose.", encoding="utf-8")
+    return path
+
+
+def _write_assistant_result_settlement(*, chapter_number: int, prose_path: str) -> Path:
+    path = (
+        Path("artifacts")
+        / f"chapter-{chapter_number}"
+        / f"chapter-{chapter_number}.settlement.json"
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "chapter": chapter_number,
+                "prose_path": prose_path,
+                "summary": "Summary.",
+                "continuity_notes": [],
+                "open_questions": [],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
     return path
 
 

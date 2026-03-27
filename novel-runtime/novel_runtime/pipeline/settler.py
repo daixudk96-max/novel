@@ -15,6 +15,14 @@ _SETTLEMENT_KEYS = {
     "foreshadow_updates",
 }
 
+_GUIDED_SETTLEMENT_METADATA_KEYS = {
+    "chapter",
+    "prose_path",
+    "summary",
+    "continuity_notes",
+    "open_questions",
+}
+
 
 class AlreadySettledError(ValueError):
     pass
@@ -36,7 +44,7 @@ class ChapterSettler:
             raise ValueError("settlement_data must be a dict")
 
         working_state = CanonicalState(data=deepcopy(state.data))
-        chapter = self._get_chapter(working_state, chapter_number)
+        chapter = self._get_or_bootstrap_chapter(working_state, chapter_number)
         if chapter["status"] != "draft":
             raise AlreadySettledError(f"chapter '{chapter_number}' is already settled")
 
@@ -47,6 +55,23 @@ class ChapterSettler:
         state.data = working_state.data
         return state
 
+    def _get_or_bootstrap_chapter(
+        self, state: CanonicalState, chapter_number: int
+    ) -> dict:
+        try:
+            return self._get_chapter(state, chapter_number)
+        except ValueError:
+            chapter = {
+                "number": chapter_number,
+                "title": f"Chapter {chapter_number}",
+                "status": "draft",
+                "summary": "",
+                "settled_at": "",
+            }
+            state.data["chapters"].append(chapter)
+            state.data["chapters"].sort(key=lambda item: item["number"])
+            return chapter
+
     def _get_chapter(self, state: CanonicalState, chapter_number: int) -> dict:
         for chapter in state.data["chapters"]:
             if chapter["number"] == chapter_number:
@@ -54,7 +79,8 @@ class ChapterSettler:
         raise ValueError(f"chapter '{chapter_number}' not found")
 
     def _normalize_settlement_data(self, settlement_data: dict) -> dict:
-        unknown_keys = sorted(set(settlement_data) - _SETTLEMENT_KEYS)
+        allowed_keys = _SETTLEMENT_KEYS | _GUIDED_SETTLEMENT_METADATA_KEYS
+        unknown_keys = sorted(set(settlement_data) - allowed_keys)
         if unknown_keys:
             raise ValueError(f"unknown settlement fields: {', '.join(unknown_keys)}")
 

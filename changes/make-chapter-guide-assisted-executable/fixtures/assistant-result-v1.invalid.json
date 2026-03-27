@@ -1,0 +1,17 @@
+{
+  "version": "assistant-result/v1",
+  "chapter": 1,
+  "operations_performed": [
+    "read_project_files",
+    "invoke_published_cli_command"
+  ],
+  "created_files": [
+    "artifacts/chapter-1/chapter-1.md"
+  ],
+  "prose_path": "artifacts/chapter-1/chapter-1.md",
+  "command_receipts": [],
+  "warnings": [
+    "intentionally invalid fixture for validator rejection coverage"
+  ],
+  "ready_for_cli_validation": true
+}

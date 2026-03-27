@@ -1,0 +1,124 @@
+{
+  "ok": true,
+  "command": "chapter guide",
+  "version": "novel-cli-agent/v1",
+  "warnings": [],
+  "recommended_action": "chapter verify-guided-result",
+  "data": {
+    "guidance_id": "guide-chapter-1-route-b-v1",
+    "version": "route-b-guidance/v1",
+    "workflow_id": "chapter-guided-assistant-v1",
+    "chapter": 1,
+    "route": "Route B phase 1",
+    "allowed_operations": [
+      "read_project_files",
+      "write_text_artifact",
+      "write_json_artifact",
+      "invoke_published_cli_command",
+      "capture_command_receipt",
+      "bundle_named_outputs"
+    ],
+    "required_inputs": [
+      {
+        "key": "chapter_number",
+        "source_of_truth": "chapter guide --chapter N",
+        "access": "guidance_metadata"
+      },
+      {
+        "key": "selected_project",
+        "source_of_truth": "published CLI project context",
+        "access": "guidance_metadata"
+      }
+    ],
+    "required_artifacts": [
+      {
+        "key": "prose_artifact",
+        "kind": "text",
+        "required": true,
+        "description": "Chapter prose artifact produced by the assistant"
+      },
+      {
+        "key": "settlement_artifact",
+        "kind": "json",
+        "required": true,
+        "description": "Assistant-filled settlement JSON created from the emitted template"
+      },
+      {
+        "key": "assistant_result_manifest",
+        "kind": "json",
+        "required": true,
+        "description": "assistant-result/v1 manifest returned for CLI validation"
+      }
+    ],
+    "command_sequence": [
+      {
+        "step_id": "read-chapter-context",
+        "operation": "read_project_files",
+        "inputs": [
+          "chapter_number",
+          "selected_project"
+        ],
+        "outputs": [
+          "chapter_context"
+        ]
+      },
+      {
+        "step_id": "write-prose-artifact",
+        "operation": "write_text_artifact",
+        "inputs": [
+          "chapter_context"
+        ],
+        "outputs": [
+          "prose_artifact"
+        ]
+      },
+      {
+        "step_id": "write-settlement-artifact",
+        "operation": "write_json_artifact",
+        "inputs": [
+          "prose_artifact"
+        ],
+        "outputs": [
+          "settlement_artifact"
+        ]
+      },
+      {
+        "step_id": "bundle-return-artifacts",
+        "operation": "bundle_named_outputs",
+        "inputs": [
+          "prose_artifact",
+          "settlement_artifact"
+        ],
+        "outputs": [
+          "assistant_result_manifest"
+        ]
+      }
+    ],
+    "validation_gates": [
+      {
+        "gate_id": "manifest-matches-upstream-contract",
+        "description": "Return manifest must satisfy assistant-result/v1 exactly"
+      },
+      {
+        "gate_id": "settlement-file-present",
+        "description": "Settlement JSON must exist as a separate file-backed artifact"
+      },
+      {
+        "gate_id": "forbidden-paths-not-used",
+        "description": "No returned path may resolve to canonical_state.json or .novel_project_path"
+      }
+    ],
+    "settlement_template": {
+      "chapter": 1,
+      "prose_path": "artifacts/chapter-1/chapter-1.md",
+      "summary": "",
+      "continuity_notes": [],
+      "open_questions": []
+    },
+    "expected_return_manifest": {
+      "manifest_name": "assistant-result-v1",
+      "required_reference_field": "guidance_id"
+    },
+    "next_cli_step": "chapter verify-guided-result"
+  }
+}

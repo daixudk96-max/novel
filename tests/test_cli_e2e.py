@@ -1,3 +1,5 @@
+# pyright: reportMissingImports=false
+
 import json
 from pathlib import Path
 
@@ -13,6 +15,8 @@ def _assert_current_chapter_surface(runner: CliRunner) -> None:
 
     assert result.exit_code == 0
     assert "draft" in result.output
+    assert "guide" in result.output
+    assert "verify-guided-result" in result.output
     assert "settle" in result.output
     assert "postcheck" in result.output
     assert "audit" in result.output
@@ -539,10 +543,421 @@ def test_chapter_full_lifecycle_json_mode(monkeypatch) -> None:
         assert snapshot_state["timeline"] == state["timeline"]
 
 
+def test_route_b_guided_flow_without_llm_env(monkeypatch) -> None:
+    from novel_cli.commands import chapter as chapter_commands
+
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _clear_llm_env(monkeypatch)
+        _assert_current_chapter_surface(runner)
+
+        def unexpected_route_a_usage(*args, **kwargs):
+            raise AssertionError("Route B flow must not call chapter draft")
+
+        monkeypatch.setattr(
+            chapter_commands, "build_route_a_provider", unexpected_route_a_usage
+        )
+        monkeypatch.setattr(
+            chapter_commands, "_build_chapter_drafter", unexpected_route_a_usage
+        )
+
+        init_payload = _invoke_json(
+            runner, ["project", "init", "mybook", "--genre", "fantasy"]
+        )
+        add_payload = _invoke_json(
+            runner,
+            [
+                "world",
+                "entity",
+                "add",
+                "--name",
+                "Kai",
+                "--type",
+                "character",
+                "--attributes",
+                '{"role": "lead"}',
+            ],
+        )
+        guide_payload = _invoke_json(runner, ["chapter", "guide", "--chapter", "1"])
+
+        project_dir = Path("mybook")
+        manifest_path, prose_path, settlement_path = _write_guided_result_artifacts(
+            chapter_number=1
+        )
+
+        assert guide_payload["recommended_action"] == "chapter verify-guided-result"
+        verify_payload = _invoke_json(
+            runner,
+            [
+                "chapter",
+                "verify-guided-result",
+                "--chapter",
+                "1",
+                "--manifest-file",
+                str(manifest_path),
+            ],
+        )
+        assert verify_payload["recommended_action"] == "chapter settle"
+
+        settle_payload = _invoke_json(
+            runner,
+            [
+                "chapter",
+                "settle",
+                "--chapter",
+                "1",
+                "--settlement-file",
+                verify_payload["data"]["settlement_path"],
+                "--text-file",
+                verify_payload["data"]["prose_path"],
+            ],
+        )
+        postcheck_payload = _invoke_json(
+            runner,
+            [
+                "chapter",
+                "postcheck",
+                "--chapter",
+                "1",
+                "--text-file",
+                str(prose_path),
+            ],
+        )
+        audit_payload = _invoke_json(
+            runner,
+            [
+                "chapter",
+                "audit",
+                "--chapter",
+                "1",
+                "--text-file",
+                str(prose_path),
+            ],
+        )
+        audit_path = Path("audit.json")
+        audit_path.write_text(
+            json.dumps(audit_payload, ensure_ascii=False), encoding="utf-8"
+        )
+        route_payload = _invoke_json(
+            runner,
+            [
+                "chapter",
+                "route",
+                "--chapter",
+                "1",
+                "--audit-file",
+                str(audit_path),
+            ],
+        )
+        revise_payload = _invoke_json(
+            runner,
+            [
+                "chapter",
+                "revise",
+                "--chapter",
+                "1",
+                "--text-file",
+                str(prose_path),
+                "--audit-file",
+                str(audit_path),
+            ],
+        )
+        approve_payload = _invoke_json(
+            runner,
+            [
+                "chapter",
+                "approve",
+                "--chapter",
+                "1",
+                "--audit-file",
+                str(audit_path),
+            ],
+        )
+        snapshot_payload = _invoke_json(
+            runner, ["snapshot", "create", "--label", "route-b-guided"]
+        )
+        state_payload = _invoke_json(runner, ["state", "show"])
+
+        assert init_payload["name"] == "mybook"
+        assert add_payload["entity"] == {
+            "id": "entity-1",
+            "name": "Kai",
+            "type": "character",
+            "attributes": {"role": "lead"},
+            "visibility": "active",
+        }
+        assert guide_payload["data"]["version"] == "route-b-guidance/v1"
+        assert guide_payload["data"]["workflow_id"] == "chapter-guided-assistant-v1"
+        assert guide_payload["data"]["allowed_operations"] == [
+            "read_project_files",
+            "write_text_artifact",
+            "write_json_artifact",
+            "invoke_published_cli_command",
+            "capture_command_receipt",
+            "bundle_named_outputs",
+        ]
+        assert verify_payload == {
+            "ok": True,
+            "command": "chapter verify-guided-result",
+            "version": "novel-cli-agent/v1",
+            "data": {
+                "guidance_id": "guide-chapter-1-route-b-v1",
+                "chapter": 1,
+                "prose_path": str(prose_path.resolve()),
+                "settlement_path": str(settlement_path.resolve()),
+                "command_receipts": [],
+                "warnings": [],
+                "ready_for_cli_validation": True,
+            },
+            "warnings": [],
+            "recommended_action": "chapter settle",
+        }
+        assert settle_payload == {"chapter": 1, "status": "settled"}
+        assert postcheck_payload == {"chapter": 1, "passed": True, "issues": []}
+        assert audit_payload == {
+            "chapter": 1,
+            "status": "pass",
+            "severity": "none",
+            "recommended_action": "proceed_to_snapshot",
+            "issues": [],
+        }
+        assert route_payload == {
+            "action": "pass",
+            "reason": "audit passed with no blocking issues",
+            "audit_summary": {
+                "chapter": 1,
+                "status": "pass",
+                "severity": "none",
+                "recommended_action": "proceed_to_snapshot",
+                "issue_count": 0,
+                "blocker_issue_count": 0,
+            },
+        }
+        assert revise_payload == {
+            "chapter": 1,
+            "routing_action": "pass",
+            "reason": "audit passed with no blocking issues",
+        }
+        assert approve_payload == {
+            "chapter": 1,
+            "status": "approved",
+            "reason": "audit passed and chapter is ready for snapshot",
+            "conditions": [],
+        }
+
+        snapshot = snapshot_payload["snapshot"]
+        assert snapshot["id"]
+        assert snapshot["label"] == "route-b-guided"
+        assert snapshot["timestamp"]
+        assert not (project_dir / "chapters" / "chapter_1.md").exists()
+        assert not (project_dir / "chapters" / "chapter_1_revised.md").exists()
+
+        state = state_payload["state"]
+        assert state["project"] == CanonicalState.load(project_dir).data["project"]
+        assert state["world"]["entities"] == [
+            {
+                "id": "entity-1",
+                "name": "Kai",
+                "type": "character",
+                "attributes": {"role": "lead", "location": "Archive"},
+                "visibility": "active",
+            },
+            {
+                "id": "entity-2",
+                "name": "Archive",
+                "type": "location",
+                "attributes": {"kind": "library"},
+                "visibility": "reference",
+            },
+        ]
+        assert state["chapters"] == [
+            {
+                "number": 1,
+                "title": "Chapter 1",
+                "status": "settled",
+                "summary": "",
+                "settled_at": state["chapters"][0]["settled_at"],
+            }
+        ]
+        assert state["chapters"][0]["settled_at"]
+        assert state["timeline"]["events"] == [
+            {
+                "chapter": 1,
+                "type": "arrival",
+                "summary": "Kai arrives at the Archive.",
+                "entities": ["entity-1", "entity-2"],
+            }
+        ]
+        snapshot_state = SnapshotManager(project_dir).load_snapshot(snapshot["id"]).data
+        assert snapshot_state["chapters"] == state["chapters"]
+        assert snapshot_state["timeline"] == state["timeline"]
+
+
+def test_route_b_guided_flow_rejects_validation_bypass(monkeypatch) -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        _clear_llm_env(monkeypatch)
+        _assert_current_chapter_surface(runner)
+
+        _invoke_json(runner, ["project", "init", "mybook", "--genre", "fantasy"])
+        _invoke_json(
+            runner,
+            [
+                "world",
+                "entity",
+                "add",
+                "--name",
+                "Kai",
+                "--type",
+                "character",
+                "--attributes",
+                '{"role": "lead"}',
+            ],
+        )
+        guide_payload = _invoke_json(runner, ["chapter", "guide", "--chapter", "1"])
+        assert guide_payload["recommended_action"] == "chapter verify-guided-result"
+        project_dir = Path("mybook")
+        before_state = json.loads(
+            json.dumps(CanonicalState.load(project_dir).data, sort_keys=True)
+        )
+        manifest_path, _, _ = _write_guided_result_artifacts(
+            chapter_number=1,
+            ready_for_cli_validation=False,
+        )
+
+        result = runner.invoke(
+            cli,
+            [
+                "--json",
+                "chapter",
+                "verify-guided-result",
+                "--chapter",
+                "1",
+                "--manifest-file",
+                str(manifest_path),
+            ],
+            catch_exceptions=False,
+        )
+
+        after_state = json.loads(
+            json.dumps(CanonicalState.load(project_dir).data, sort_keys=True)
+        )
+
+        assert result.exit_code == 1
+        assert json.loads(result.output) == {
+            "error": "manifest ready_for_cli_validation must be true",
+            "code": 1,
+        }
+        assert after_state == before_state
+        assert after_state["chapters"] == []
+
+
 def _invoke_json(runner: CliRunner, args: list[str]) -> dict:
     result = runner.invoke(cli, ["--json", *args], catch_exceptions=False)
     assert result.exit_code == 0
     return json.loads(result.output)
+
+
+def _clear_llm_env(monkeypatch) -> None:
+    for name in (
+        "NOVEL_LLM_PROVIDER",
+        "NOVEL_LLM_MODEL",
+        "NOVEL_LLM_API_KEY",
+        "OPENAI_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
+def _write_guided_result_artifacts(
+    *, chapter_number: int, ready_for_cli_validation: bool = True
+) -> tuple[Path, Path, Path]:
+    prose_path = (
+        Path("artifacts") / f"chapter-{chapter_number}" / f"chapter-{chapter_number}.md"
+    )
+    prose_path.parent.mkdir(parents=True, exist_ok=True)
+    prose_path.write_text("Kai reaches the Archive at dawn.", encoding="utf-8")
+
+    settlement_path = (
+        Path("artifacts")
+        / f"chapter-{chapter_number}"
+        / f"chapter-{chapter_number}.settlement.json"
+    )
+    settlement_path.write_text(
+        json.dumps(
+            {
+                "chapter": chapter_number,
+                "prose_path": prose_path.as_posix(),
+                "summary": "",
+                "continuity_notes": [],
+                "open_questions": [],
+                "new_entities": [
+                    {
+                        "id": "entity-2",
+                        "name": "Archive",
+                        "type": "location",
+                        "attributes": {"kind": "library"},
+                        "visibility": "reference",
+                    }
+                ],
+                "updated_entities": [
+                    {
+                        "id": "entity-1",
+                        "attributes": {
+                            "role": "lead",
+                            "location": "Archive",
+                        },
+                    }
+                ],
+                "new_relationships": [
+                    {
+                        "source": "entity-1",
+                        "target": "entity-2",
+                        "type": "arrives-at",
+                        "since_chapter": chapter_number,
+                    }
+                ],
+                "events": [
+                    {
+                        "chapter": chapter_number,
+                        "type": "arrival",
+                        "summary": "Kai arrives at the Archive.",
+                        "entities": ["entity-1", "entity-2"],
+                    }
+                ],
+                "foreshadow_updates": [],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    manifest_path = Path("assistant-result.json")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "guidance_id": f"guide-chapter-{chapter_number}-route-b-v1",
+                "version": "assistant-result/v1",
+                "chapter": chapter_number,
+                "operations_performed": [
+                    "read_project_files",
+                    "write_text_artifact",
+                    "write_json_artifact",
+                    "bundle_named_outputs",
+                ],
+                "created_files": [prose_path.as_posix(), settlement_path.as_posix()],
+                "prose_path": prose_path.as_posix(),
+                "settlement_path": settlement_path.as_posix(),
+                "command_receipts": [],
+                "warnings": [],
+                "ready_for_cli_validation": ready_for_cli_validation,
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    return manifest_path, prose_path, settlement_path
 
 
 class _E2EFakeDraftProvider:

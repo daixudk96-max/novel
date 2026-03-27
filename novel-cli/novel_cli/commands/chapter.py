@@ -6,9 +6,11 @@ from typing import Any, Never
 
 import click
 from novel_runtime.llm.provider import build_route_a_provider
+from novel_runtime.pipeline.assistant_result_validator import AssistantResultValidator
 from novel_runtime.pipeline.approver import ChapterApprover
 from novel_runtime.pipeline.auditor import AuditIssue, AuditResult, ChapterAuditor
 from novel_runtime.pipeline.drafter import ChapterDraft, ChapterDrafter
+from novel_runtime.pipeline.guider import ChapterGuider, first_active_world_entity
 from novel_runtime.pipeline.postcheck import PostcheckRunner
 from novel_runtime.pipeline.reviser import ChapterReviser, RevisionResult
 from novel_runtime.pipeline.router import ChapterRouter
@@ -53,6 +55,26 @@ def draft_chapter(chapter_number: int, json_output: bool) -> None:
         f"Drafted chapter {chapter_number} at {chapter_path.resolve()}",
         json_output,
     )
+
+
+@chapter_group.command("guide")
+@click.option("--chapter", "chapter_number", required=True, type=int)
+@click.option("--json", "json_output", is_flag=True)
+def guide_chapter(chapter_number: int, json_output: bool) -> None:
+    state, _ = _load_state()
+    try:
+        payload = {
+            "ok": True,
+            "command": "chapter guide",
+            "version": "novel-cli-agent/v1",
+            "warnings": [],
+            "recommended_action": "chapter verify-guided-result",
+            "data": ChapterGuider().guide(state, chapter_number),
+        }
+    except ValueError as exc:
+        _raise_fail(str(exc), json_output)
+
+    _emit(payload, _format_guidance_text(payload), json_output)
 
 
 @chapter_group.command("settle")
@@ -269,6 +291,49 @@ def approve_chapter(
         raise SystemExit(1)
 
 
+@chapter_group.command("verify-guided-result")
+@click.option("--chapter", "chapter_number", required=True, type=int)
+@click.option(
+    "--manifest-file",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option("--json", "json_output", is_flag=True)
+def verify_guided_result(
+    chapter_number: int, manifest_file: Path, json_output: bool
+) -> None:
+    _resolve_project_dir()
+    try:
+        validated = AssistantResultValidator().validate(
+            chapter_number=chapter_number,
+            manifest_file=manifest_file,
+        )
+    except ValueError as exc:
+        _raise_fail(str(exc), json_output)
+
+    payload = {
+        "ok": True,
+        "command": "chapter verify-guided-result",
+        "version": "novel-cli-agent/v1",
+        "data": {
+            "guidance_id": validated.guidance_id,
+            "chapter": validated.chapter,
+            "prose_path": str(validated.prose_path),
+            "settlement_path": str(validated.settlement_path),
+            "command_receipts": validated.command_receipts,
+            "warnings": validated.warnings,
+            "ready_for_cli_validation": validated.ready_for_cli_validation,
+        },
+        "warnings": validated.warnings,
+        "recommended_action": "chapter settle",
+    }
+    text = _format_verify_guided_result_text(
+        chapter_number=validated.chapter,
+        guidance_id=validated.guidance_id,
+    )
+    _emit(payload, text, json_output)
+
+
 def _load_state() -> tuple[CanonicalState, Path]:
     project_dir = _resolve_project_dir()
     return CanonicalState.load(project_dir), project_dir
@@ -279,13 +344,7 @@ def _build_chapter_drafter() -> ChapterDrafter:
 
 
 def _require_draft_entity(state: CanonicalState, chapter_number: int) -> None:
-    for entity in state.data["world"]["entities"]:
-        if not isinstance(entity, dict):
-            continue
-        if entity.get("visibility") != "active":
-            continue
-        if not isinstance(entity.get("name"), str) or not entity["name"].strip():
-            continue
+    if first_active_world_entity(state) is not None:
         return
     raise ValueError(
         f"chapter {chapter_number} draft requires at least one active world entity"
@@ -502,6 +561,30 @@ def _format_approval_text(payload: dict[str, object]) -> str:
     for condition in conditions:
         lines.append(f"- {condition}")
     return "\n".join(lines)
+
+
+def _format_verify_guided_result_text(*, chapter_number: int, guidance_id: str) -> str:
+    return "\n".join(
+        (
+            f"Chapter: {chapter_number}",
+            f"Guidance ID: {guidance_id}",
+            "Ready for CLI validation: yes",
+            "Recommended action: chapter settle",
+        )
+    )
+
+
+def _format_guidance_text(payload: dict[str, object]) -> str:
+    data = payload["data"]
+    assert isinstance(data, dict)
+    return "\n".join(
+        (
+            f"Chapter: {data['chapter']}",
+            f"Route: {data['route']}",
+            f"Guidance ID: {data['guidance_id']}",
+            f"Recommended action: {payload['recommended_action']}",
+        )
+    )
 
 
 def _raise_fail(message: str, json_output: bool) -> Never:

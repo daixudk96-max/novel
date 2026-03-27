@@ -1,0 +1,20 @@
+{
+  "guidance_id": "guide-chapter-1-route-b-v1",
+  "version": "assistant-result/v1",
+  "chapter": 1,
+  "operations_performed": [
+    "read_project_files",
+    "write_text_artifact",
+    "write_json_artifact",
+    "bundle_named_outputs"
+  ],
+  "created_files": [
+    "artifacts/chapter-1/chapter-1.md",
+    "artifacts/chapter-1/chapter-1.settlement.json"
+  ],
+  "prose_path": "artifacts/chapter-1/chapter-1.md",
+  "settlement_path": "artifacts/chapter-1/chapter-1.settlement.json",
+  "command_receipts": [],
+  "warnings": [],
+  "ready_for_cli_validation": true
+}

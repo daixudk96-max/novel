@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import deepcopy
+
 import pytest
 
 from novel_runtime.pipeline.settler import AlreadySettledError, ChapterSettler
@@ -107,7 +109,49 @@ def test_settle_already_settled_raises() -> None:
         ChapterSettler().settle(state, 1, "Mira reached the vault.", _settlement_data())
 
 
-def _build_state() -> CanonicalState:
+def test_settle_bootstraps_missing_row_atomically() -> None:
+    state = _build_state(include_chapter=False)
+
+    updated_state = ChapterSettler().settle(
+        state,
+        1,
+        "Mira reached the vault.",
+        _settlement_data(),
+    )
+
+    assert updated_state.data["chapters"] == [
+        {
+            "number": 1,
+            "title": "Chapter 1",
+            "status": "settled",
+            "summary": "",
+            "settled_at": updated_state.data["chapters"][0]["settled_at"],
+        }
+    ]
+    assert updated_state.data["chapters"][0]["settled_at"].endswith("Z")
+
+
+def test_settle_failure_leaves_state_unchanged_for_guided_ingress() -> None:
+    state = _build_state(include_chapter=False)
+    before = deepcopy(state.data)
+
+    with pytest.raises(ValueError, match="missing-entity"):
+        ChapterSettler().settle(
+            state,
+            1,
+            "Mira reached the vault.",
+            {
+                **_settlement_data(),
+                "updated_entities": [
+                    {"id": "missing-entity", "attributes": {"location": "Nowhere"}}
+                ],
+            },
+        )
+
+    assert state.data == before
+
+
+def _build_state(*, include_chapter: bool = True) -> CanonicalState:
     state = CanonicalState.create_empty("Settler Novel", "fantasy")
     state.data["world"]["entities"].append(
         {
@@ -118,15 +162,16 @@ def _build_state() -> CanonicalState:
             "visibility": "active",
         }
     )
-    state.data["chapters"].append(
-        {
-            "number": 1,
-            "title": "Arrival",
-            "status": "draft",
-            "summary": "Mira searches the ridge for the hidden vault.",
-            "settled_at": "",
-        }
-    )
+    if include_chapter:
+        state.data["chapters"].append(
+            {
+                "number": 1,
+                "title": "Arrival",
+                "status": "draft",
+                "summary": "Mira searches the ridge for the hidden vault.",
+                "settled_at": "",
+            }
+        )
     return state
 
 
